@@ -1,11 +1,11 @@
 # scripts/generate_week8_json.R
-# Template for generating exact data/arima_examples.json from the Week 8 workflow.
+# Template for generating exact data/arima_examples.json from the Week 8/9 workflow.
 
 library(fpp3)
 library(jsonlite)
 
-# This script is a template. It follows the same workflow used in week8.R:
-# inspect series -> candidate models -> glance(AICc/BIC) -> augment residuals -> forecast.
+# This script is a template. It follows the same classroom workflow:
+# prepare data -> candidate models -> glance(AICc/BIC) -> augment residuals -> forecast.
 
 make_model_bundle <- function(data, value, models, h = 10, lag = 10, dof_lookup = NULL) {
   # TODO:
@@ -14,7 +14,7 @@ make_model_bundle <- function(data, value, models, h = 10, lag = 10, dof_lookup 
   # - models: named model specification list
   # Return list containing:
   # - historical labels and values
-  # - candidate model specs
+  # - candidate model specs, including transform, p/d/q, P/D/Q, period and c
   # - forecast means and 80/95 intervals
   # - augment() fitted values and .innov residuals
   # - glance() metrics including AICc/BIC
