@@ -7,9 +7,9 @@ This version keeps the app as a live lever playground while covering the core We
 - Candidate model mode
 - Manual model mode
 - Log transform, first-difference, and seasonal-difference controls
-- Core ARIMA mode by default, with Week 9 seasonal ARIMA behind a topic selector
+- Study-focus selector for choosing p/q, differencing, or seasonal patterns
 - Week 7-style stationarity example
-- Week 9-style seasonal ARIMA example
+- Seasonal ARIMA example
 - AICc/BIC-style comparison table
 - Residual diagnostics tab
 - R/fable-ready JSON structure in `data/arima_examples.json`

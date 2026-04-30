@@ -148,7 +148,7 @@
           "c": true,
           "id": "ar4",
           "label": "Manual ARIMA(4,0,0)+c",
-          "source": "week8 manual AR example"
+          "source": "class manual AR example"
         },
         {
           "transform": "none",
@@ -182,7 +182,9 @@
       "lesson_focus": "non-seasonal arima",
       "default_transform": "none",
       "seasonal_period": 0,
-      "topic_level": "core"
+      "study_focus": [
+        "pq"
+      ]
     },
     {
       "id": "caf_style",
@@ -340,7 +342,7 @@
           "c": false,
           "id": "ar210",
           "label": "Manual ARIMA(2,1,0)",
-          "source": "week8 CAF candidate"
+          "source": "class CAF candidate"
         },
         {
           "transform": "none",
@@ -354,7 +356,7 @@
           "c": false,
           "id": "ma013",
           "label": "Manual ARIMA(0,1,3)",
-          "source": "week8 CAF candidate"
+          "source": "class CAF candidate"
         },
         {
           "transform": "none",
@@ -388,7 +390,10 @@
       "lesson_focus": "non-seasonal arima",
       "default_transform": "none",
       "seasonal_period": 0,
-      "topic_level": "core"
+      "study_focus": [
+        "difference",
+        "pq"
+      ]
     },
     {
       "id": "us_consumption",
@@ -590,7 +595,7 @@
           "c": true,
           "id": "ar2",
           "label": "Manual ARIMA(2,0,0)+c",
-          "source": "week8 first try"
+          "source": "class first try"
         },
         {
           "transform": "none",
@@ -604,7 +609,7 @@
           "c": true,
           "id": "ar3",
           "label": "Manual ARIMA(3,0,0)+c",
-          "source": "week8 corrected AR"
+          "source": "class corrected AR"
         },
         {
           "transform": "none",
@@ -618,7 +623,7 @@
           "c": true,
           "id": "ma3",
           "label": "Manual ARIMA(0,0,3)+c",
-          "source": "week8 alternative MA"
+          "source": "class alternative MA"
         },
         {
           "transform": "none",
@@ -638,7 +643,9 @@
       "lesson_focus": "non-seasonal arima",
       "default_transform": "none",
       "seasonal_period": 4,
-      "topic_level": "core"
+      "study_focus": [
+        "pq"
+      ]
     },
     {
       "id": "mink_style",
@@ -812,7 +819,7 @@
           "c": true,
           "id": "ar4",
           "label": "Manual ARIMA(4,0,0)+c",
-          "source": "week8 manual cycle"
+          "source": "class manual cycle"
         },
         {
           "transform": "none",
@@ -860,7 +867,9 @@
       "lesson_focus": "non-seasonal arima",
       "default_transform": "none",
       "seasonal_period": 0,
-      "topic_level": "core"
+      "study_focus": [
+        "pq"
+      ]
     },
     {
       "id": "cement_stationarity",
@@ -1121,7 +1130,7 @@
           "Q": 1,
           "period": 4,
           "c": false,
-          "source": "week7 stationarity"
+          "source": "class stationarity"
         },
         {
           "id": "double_diff",
@@ -1135,7 +1144,7 @@
           "Q": 1,
           "period": 4,
           "c": false,
-          "source": "week7 double differencing"
+          "source": "class double differencing"
         },
         {
           "id": "too_plain",
@@ -1152,7 +1161,10 @@
           "source": "contrast"
         }
       ],
-      "topic_level": "core"
+      "study_focus": [
+        "difference",
+        "seasonal"
+      ]
     },
     {
       "id": "h02_seasonal",
@@ -1793,7 +1805,7 @@
           "Q": 0,
           "period": 12,
           "c": true,
-          "source": "week9 H02 first guess"
+          "source": "seasonal H02 first guess"
         },
         {
           "id": "seasonal_ma",
@@ -1807,7 +1819,7 @@
           "Q": 2,
           "period": 12,
           "c": false,
-          "source": "week9 plausible alternative"
+          "source": "seasonal plausible alternative"
         },
         {
           "id": "auto_style",
@@ -1821,10 +1833,12 @@
           "Q": 1,
           "period": 12,
           "c": false,
-          "source": "week9 auto-style"
+          "source": "seasonal auto-style"
         }
       ],
-      "topic_level": "week9"
+      "study_focus": [
+        "seasonal"
+      ]
     }
   ]
 }
