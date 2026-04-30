@@ -181,7 +181,8 @@
       ],
       "lesson_focus": "non-seasonal arima",
       "default_transform": "none",
-      "seasonal_period": 0
+      "seasonal_period": 0,
+      "topic_level": "core"
     },
     {
       "id": "caf_style",
@@ -386,7 +387,8 @@
       ],
       "lesson_focus": "non-seasonal arima",
       "default_transform": "none",
-      "seasonal_period": 0
+      "seasonal_period": 0,
+      "topic_level": "core"
     },
     {
       "id": "us_consumption",
@@ -635,7 +637,8 @@
       ],
       "lesson_focus": "non-seasonal arima",
       "default_transform": "none",
-      "seasonal_period": 4
+      "seasonal_period": 4,
+      "topic_level": "core"
     },
     {
       "id": "mink_style",
@@ -856,7 +859,8 @@
       ],
       "lesson_focus": "non-seasonal arima",
       "default_transform": "none",
-      "seasonal_period": 0
+      "seasonal_period": 0,
+      "topic_level": "core"
     },
     {
       "id": "cement_stationarity",
@@ -1147,7 +1151,8 @@
           "c": true,
           "source": "contrast"
         }
-      ]
+      ],
+      "topic_level": "core"
     },
     {
       "id": "h02_seasonal",
@@ -1818,7 +1823,8 @@
           "c": false,
           "source": "week9 auto-style"
         }
-      ]
+      ],
+      "topic_level": "week9"
     }
   ]
 }

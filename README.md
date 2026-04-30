@@ -7,7 +7,7 @@ This version keeps the app as a live lever playground while covering the core We
 - Candidate model mode
 - Manual model mode
 - Log transform, first-difference, and seasonal-difference controls
-- Non-seasonal and seasonal ARIMA levers
+- Core ARIMA mode by default, with Week 9 seasonal ARIMA behind a topic selector
 - Week 7-style stationarity example
 - Week 9-style seasonal ARIMA example
 - AICc/BIC-style comparison table
