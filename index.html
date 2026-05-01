@@ -550,7 +550,13 @@ function setMode(next){mode=next; el("candidateMode").classList.toggle("active",
 function setView(view){activeView=view; el("exploreTab").classList.toggle("active",view==="explore"); el("checkTab").classList.toggle("active",view==="check"); el("exploreView").classList.toggle("active",view==="explore"); el("checkView").classList.toggle("active",view==="check");}
 
 function renderComparison(ds, selected){
-  const rows=visibleCandidates(ds).map(c=>{const params=normalizeParams(c); const score=modelScore(ds,params); return {...params,label:friendlyCandidateLabel(params),...score}}).sort((a,b)=>a.aicc-b.aicc);
+  const activePrep = {
+    transform:selected.transform,
+    d:selected.d,
+    D:selected.D,
+    period:selected.period
+  };
+  const rows=visibleCandidates(ds).map(c=>{const params=normalizeParams({...c,...activePrep}); const score=modelScore(ds,params); return {...params,label:friendlyCandidateLabel(params),...score}}).sort((a,b)=>a.aicc-b.aicc);
   const bestId=rows[0]?.id;
   const selectedId = mode==="candidate" ? selected.id : "manual";
   const manualRow = mode==="manual" ? [{id:"manual",label:"Manual current",...selected,...modelScore(ds,selected)}] : [];
