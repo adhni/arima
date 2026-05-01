@@ -2,7 +2,6 @@
 
 This version moves from a pure lever playground toward the Week 8 R workflow.
 
-## New in v5
 
 - Candidate model mode
 - Manual model mode
