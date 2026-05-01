@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ARIMA Workflow Visualiser v5</title>
-<meta name="description" content="A static R-style ARIMA workflow visualiser with candidate models, AICc-style comparison, forecast and residual diagnostics.">
+<title>ARIMA Workflow Visualiser v6</title>
+<meta name="description" content="A static R-style ARIMA workflow visualiser with live transformation, seasonal ARIMA levers, model comparison and residual diagnostics.">
 <style>
 :root {
   --bg:#f3f3f1; --panel:#fff; --ink:#1f2328; --muted:#68707d; --border:#d8d8d8;
@@ -16,7 +16,7 @@
   --sans:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);zoom:.8}
 .wrap{width:min(1360px,calc(100% - 28px));margin:0 auto;padding:18px 0 54px}
 header{display:flex;justify-content:space-between;gap:18px;align-items:end;margin-bottom:12px}
 h1{font-size:clamp(1.9rem,3.5vw,3.8rem);line-height:.92;letter-spacing:-.07em;margin:0}
@@ -24,6 +24,9 @@ h1{font-size:clamp(1.9rem,3.5vw,3.8rem);line-height:.92;letter-spacing:-.07em;ma
 .layout{display:grid;grid-template-columns:320px 1fr;gap:14px;align-items:start}
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
 .controls{padding:14px;position:sticky;top:10px}
+.control-block{border-top:1px solid #ececec;margin-top:12px;padding-top:10px}
+.step-title{display:flex;align-items:center;gap:7px;margin:0 0 7px;font-weight:850;font-size:.88rem}
+.step-title span{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:999px;background:#eef5fc;color:var(--accent);font-family:var(--mono);font-size:.75rem}
 .main{padding:12px}
 h2{font-size:1.02rem;margin:0 0 9px;letter-spacing:-.02em}
 h3{font-size:.92rem;margin:0 0 7px;letter-spacing:-.01em}
@@ -38,6 +41,12 @@ button:hover{border-color:var(--accent)}
 .badge{font-family:var(--mono);background:#f7f9fc;border:1px solid var(--border);border-radius:10px;padding:3px 8px;min-width:42px;text-align:center}
 .toggle{display:flex;gap:8px;align-items:center;border:1px solid var(--border);border-radius:999px;padding:8px 10px;margin-top:10px;cursor:pointer;user-select:none}
 .toggle input{accent-color:var(--accent)}
+.mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.seasonal-box{display:block}
+.seasonal-box.disabled{opacity:.45}
+.seasonal-box[hidden]{display:none}
+summary{cursor:pointer;font-weight:800;font-size:.84rem;margin:10px 0 5px;color:var(--accent)}
+.hint-row{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
 .mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
 .mode-grid button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 .manual{display:none}
@@ -58,7 +67,13 @@ svg{display:block;width:100%;height:auto}
 .legend{display:flex;flex-wrap:wrap;gap:10px;color:var(--muted);font-size:.82rem;margin:5px 0 0}
 .legend span::before{content:"";display:inline-block;width:14px;height:4px;border-radius:999px;background:var(--hist);margin-right:6px;vertical-align:middle}
 .legend .fc::before{background:var(--forecast)} .legend .r80::before{background:var(--r80);height:10px} .legend .r95::before{background:var(--r95);height:10px}
-.compare{margin-top:10px;padding:10px}
+.compare{margin-top:10px;padding:0;overflow:hidden}
+.compare summary{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0;padding:10px;color:var(--ink);font-size:inherit;list-style:none}
+.compare summary::-webkit-details-marker{display:none}
+.compare summary h2{margin:0}
+.compare summary::after{content:"Show";font-size:.78rem;font-weight:800;color:var(--accent);border:1px solid var(--border);border-radius:999px;padding:4px 9px;background:#fff}
+.compare[open] summary::after{content:"Hide"}
+.compare-body{padding:0 10px 10px}
 .compare table{width:100%;border-collapse:collapse;font-size:.82rem}
 .compare th,.compare td{border-bottom:1px solid #ececec;padding:6px;text-align:left;vertical-align:top}
 .compare th{color:var(--muted);font-weight:800}
@@ -73,7 +88,7 @@ svg{display:block;width:100%;height:auto}
 .lb{padding:10px;margin:10px 0 0;background:#fafafa;border:1px solid var(--border);border-radius:14px;font-size:.9rem}
 footer{text-align:center;color:var(--muted);font-size:.84rem;margin-top:16px}
 @media(max-width:1120px){.layout{grid-template-columns:1fr}.controls{position:static}}
-@media(max-width:780px){header{display:block}.chart-grid{grid-template-columns:1fr}.compact-list{grid-template-columns:1fr 1fr}.mode-grid{grid-template-columns:1fr}}
+@media(max-width:780px){header{display:block}.chart-grid{grid-template-columns:1fr}.compact-list{grid-template-columns:1fr 1fr}.mode-grid{grid-template-columns:1fr}.mini-grid{grid-template-columns:1fr}}
 @media(max-width:520px){.compact-list{grid-template-columns:1fr}}
 </style>
 </head>
@@ -82,42 +97,84 @@ footer{text-align:center;color:var(--muted);font-size:.84rem;margin-top:16px}
 <header>
   <div>
     <h1>ARIMA Workflow Visualiser</h1>
-    <div class="sub">v5 adds candidate models, an AICc-style comparison table, and residual checks. It is now closer to the Week 8 R workflow: inspect → choose candidates → compare → check residuals → forecast.</div>
+    <div class="sub">v6 keeps the class workflow visual: prepare the series, move the ARIMA levers, then check whether the residuals still have pattern.</div>
   </div>
 </header>
 
 <div class="layout">
   <aside class="panel controls">
     <h2>Controls</h2>
+    <label for="studyFocus">What are you studying?</label>
+    <select id="studyFocus">
+      <option value="pq">Choosing p and q</option>
+      <option value="difference">Trend and differencing</option>
+      <option value="seasonal">Seasonal patterns</option>
+    </select>
+
     <label for="dataset">Dataset</label>
     <select id="dataset"></select>
 
-    <label>Model mode</label>
-    <div class="mode-grid">
-      <button id="candidateMode" class="active" type="button">Candidate</button>
-      <button id="manualMode" type="button">Manual</button>
+    <div class="control-block">
+      <div class="step-title"><span>1</span>Prepare data</div>
+      <label class="toggle"><input id="logTransform" type="checkbox"> log transform</label>
+      <label><div class="value-row">d: first difference <span class="badge" id="dLabel">0</span></div></label>
+      <input id="d" type="range" min="0" max="2" value="0">
+      <label id="seasonalDiffLabel" class="toggle"><input id="seasonalDifference" type="checkbox"> seasonal difference</label>
+      <details id="advancedSeasonal" class="seasonal-box">
+        <summary>Advanced seasonal settings</summary>
+        <label for="period">Seasonal period</label>
+        <select id="period">
+          <option value="0">none</option>
+          <option value="4">4</option>
+          <option value="12">12</option>
+        </select>
+      </details>
+      <div class="hint-row" id="prepHints"></div>
     </div>
 
-    <div id="candidateControls">
-      <label for="candidate">Candidate model</label>
-      <select id="candidate"></select>
+    <div class="control-block">
+      <div class="step-title"><span>2</span>Choose model</div>
+      <label>Model mode</label>
+      <div class="mode-grid">
+        <button id="candidateMode" type="button">Candidate</button>
+        <button id="manualMode" class="active" type="button">Manual</button>
+      </div>
+
+      <div id="candidateControls" style="display:none">
+        <label for="candidate">Candidate model</label>
+        <select id="candidate"></select>
+      </div>
+
+      <div id="manualControls" class="manual active">
+        <label><div class="value-row">p: past values <span class="badge" id="pLabel">1</span></div></label>
+        <input id="p" type="range" min="0" max="5" value="1">
+        <label><div class="value-row">q: past errors <span class="badge" id="qLabel">1</span></div></label>
+        <input id="q" type="range" min="0" max="5" value="1">
+        <details id="seasonalModel" class="seasonal-box">
+          <summary>Advanced seasonal terms</summary>
+          <div class="mini-grid">
+            <div>
+              <label><div class="value-row">P <span class="badge" id="PLabel">0</span></div></label>
+              <input id="P" type="range" min="0" max="3" value="0">
+            </div>
+            <div>
+              <label><div class="value-row">Q <span class="badge" id="QLabel">0</span></div></label>
+              <input id="Q" type="range" min="0" max="3" value="0">
+            </div>
+          </div>
+        </details>
+        <label class="toggle"><input id="constant" type="checkbox" checked> include c / mean / drift</label>
+      </div>
     </div>
 
-    <div id="manualControls" class="manual">
-      <label><div class="value-row">p: past values <span class="badge" id="pLabel">1</span></div></label>
-      <input id="p" type="range" min="0" max="5" value="1">
-      <label><div class="value-row">d: trend removal <span class="badge" id="dLabel">1</span></div></label>
-      <input id="d" type="range" min="0" max="2" value="1">
-      <label><div class="value-row">q: past errors <span class="badge" id="qLabel">1</span></div></label>
-      <input id="q" type="range" min="0" max="5" value="1">
-      <label class="toggle"><input id="constant" type="checkbox" checked> include c / mean / drift</label>
+    <div class="control-block">
+      <div class="step-title"><span>3</span>Forecast</div>
+      <label><div class="value-row">Forecast horizon <span class="badge" id="hLabel">12</span></div></label>
+      <input id="horizon" type="range" min="4" max="24" value="12">
     </div>
-
-    <label><div class="value-row">Forecast horizon <span class="badge" id="hLabel">12</span></div></label>
-    <input id="horizon" type="range" min="4" max="24" value="12">
 
     <div class="pill" id="modelPill"></div>
-    <p class="tiny">Teaching proxy: charts are browser-approximated unless replaced with R/fable JSON.</p>
+    <p class="tiny">Teaching proxy: live charts use browser approximations; exact R/fable JSON can be added later.</p>
   </aside>
 
   <main class="panel main">
@@ -135,7 +192,7 @@ footer{text-align:center;color:var(--muted);font-size:.84rem;margin-top:16px}
         <div class="meta" id="forecastTakeaway"></div>
       </div>
 
-      <div class="gg-card"><svg id="forecastSvg" viewBox="0 0 920 350" aria-label="Forecast chart"></svg></div>
+      <div class="gg-card"><svg id="forecastSvg" viewBox="0 0 920 255" aria-label="Forecast chart"></svg></div>
       <div class="legend"><span>history</span><span class="fc">forecast</span><span class="r80">80% interval</span><span class="r95">95% interval</span></div>
 
       <div class="tsdisplay">
@@ -147,10 +204,10 @@ footer{text-align:center;color:var(--muted);font-size:.84rem;margin-top:16px}
           <div class="meta" id="seriesTakeaway"></div>
         </div>
 
-        <div class="gg-card"><svg id="seriesSvg" viewBox="0 0 920 240" aria-label="Differenced or original series chart"></svg></div>
+        <div class="gg-card"><svg id="seriesSvg" viewBox="0 0 920 165" aria-label="Differenced or original series chart"></svg></div>
         <div class="chart-grid">
-          <div class="gg-card"><h3>ACF</h3><svg id="acfSvg" viewBox="0 0 440 200" aria-label="ACF chart"></svg></div>
-          <div class="gg-card"><h3>PACF</h3><svg id="pacfSvg" viewBox="0 0 440 200" aria-label="PACF chart"></svg></div>
+          <div class="gg-card"><h3>ACF</h3><svg id="acfSvg" viewBox="0 0 440 135" aria-label="ACF chart"></svg></div>
+          <div class="gg-card"><h3>PACF</h3><svg id="pacfSvg" viewBox="0 0 440 135" aria-label="PACF chart"></svg></div>
         </div>
       </div>
     </section>
@@ -164,37 +221,37 @@ footer{text-align:center;color:var(--muted);font-size:.84rem;margin-top:16px}
         <div class="meta" id="residTakeaway"></div>
       </div>
 
-      <div class="gg-card"><svg id="residSvg" viewBox="0 0 920 330" aria-label="Residual chart"></svg></div>
+      <div class="gg-card"><svg id="residSvg" viewBox="0 0 920 220" aria-label="Residual chart"></svg></div>
       <div class="chart-grid">
-        <div class="gg-card"><h3>Residual ACF</h3><svg id="residAcfSvg" viewBox="0 0 440 210" aria-label="Residual ACF chart"></svg></div>
-        <div class="gg-card"><h3>Residual histogram</h3><svg id="histSvg" viewBox="0 0 440 210" aria-label="Residual histogram"></svg></div>
+        <div class="gg-card"><h3>Residual ACF</h3><svg id="residAcfSvg" viewBox="0 0 440 145" aria-label="Residual ACF chart"></svg></div>
+        <div class="gg-card"><h3>Residual histogram</h3><svg id="histSvg" viewBox="0 0 440 145" aria-label="Residual histogram"></svg></div>
       </div>
       <div class="lb" id="ljungBoxBox"></div>
-    </section>
-
-    <section class="panel compare">
-      <h2>Model comparison</h2>
-      <div id="comparisonTable"></div>
     </section>
 
     <section class="panel explain">
       <h2>What this model is doing</h2>
       <div id="explain"></div>
     </section>
+
+    <details class="panel compare">
+      <summary><h2>Model comparison</h2></summary>
+      <div class="compare-body" id="comparisonTable"></div>
+    </details>
   </main>
 </div>
 
-<footer>Static HTML/CSS/JS. Serious next step: generate exact R/fable outputs into <code>data/arima_examples.json</code>.</footer>
+<footer>Static HTML/CSS/JS. Publish-ready with teaching proxy data; exact R/fable outputs can replace <code>data/arima_examples.json</code> later.</footer>
 </div>
 
 <script>
-const SAMPLE = {"schema_version":"v5-teaching-proxy","note":"Teaching proxy data. Replace with exact fable output generated by scripts/generate_week8_json.R.","datasets":[{"id":"egypt_style","name":"Egypt-style yearly exports","frequency":"Yearly","value_label":"Exports","labels":["1982","1983","1984","1985","1986","1987","1988","1989","1990","1991","1992","1993","1994","1995","1996","1997","1998","1999","2000","2001","2002","2003","2004","2005","2006","2007","2008","2009","2010","2011","2012","2013","2014","2015","2016","2017","2018","2019","2020","2021","2022","2023"],"values":[53.739,55.145,59.977,64.671,61.436,63.049,69.702,68.649,65.563,70.04,66.899,67.068,70.068,63.927,66.409,70.175,68.205,73.272,70.163,69.586,83.575,80.715,83.112,78.439,83.022,88.166,84.955,89.318,85.753,87.552,92.802,97.021,91.405,98.392,95.194,97.422,101.053,98.263,101.428,107.411,109.746,111.239],"future_labels":["2024","2025","2026","2027","2028","2029","2030","2031","2032","2033","2034","2035","2036","2037","2038","2039","2040","2041","2042","2043","2044","2045","2046","2047"],"candidates":[{"id":"auto","label":"Auto ARIMA proxy","p":2,"d":0,"q":1,"c":true,"source":"auto-style"},{"id":"ar4","label":"Manual ARIMA(4,0,0)+c","p":4,"d":0,"q":0,"c":true,"source":"week8 manual AR example"},{"id":"rw","label":"Random walk ARIMA(0,1,0)","p":0,"d":1,"q":0,"c":false,"source":"baseline"},{"id":"ma1","label":"MA proxy ARIMA(0,0,1)+c","p":0,"d":0,"q":1,"c":true,"source":"candidate"}]},{"id":"caf_style","name":"CAF-style messy exports","frequency":"Yearly","value_label":"Exports","labels":["1960","1961","1962","1963","1964","1965","1966","1967","1968","1969","1970","1971","1972","1973","1974","1975","1976","1977","1978","1979","1980","1981","1982","1983","1984","1985","1986","1987","1988","1989","1990","1991","1992","1993","1994","1995","1996","1997","1998","1999","2000","2001","2002","2003","2004","2005","2006","2007","2008","2009","2010","2011","2012","2013"],"values":[19.8,17.6,15.0,17.8,18.4,17.1,16.4,16.8,11.9,13.6,13.6,13.3,12.7,13.7,20.4,18.1,17.2,21.6,19.9,26.5,30.6,31.0,26.3,22.9,20.7,18.2,13.9,12.6,17.4,17.8,20.4,27.5,28.4,25.9,22.6,22.5,20.8,18.8,16.2,15.0,16.2,17.5,18.3,21.8,28.2,30.4,29.9,30.3,33.1,25.0,21.4,20.6,16.4,17.0],"future_labels":["2014","2015","2016","2017","2018","2019","2020","2021","2022","2023","2024","2025","2026","2027","2028","2029","2030","2031","2032","2033","2034","2035","2036","2037"],"candidates":[{"id":"ar210","label":"Manual ARIMA(2,1,0)","p":2,"d":1,"q":0,"c":false,"source":"week8 CAF candidate"},{"id":"ma013","label":"Manual ARIMA(0,1,3)","p":0,"d":1,"q":3,"c":false,"source":"week8 CAF candidate"},{"id":"auto","label":"Auto ARIMA proxy","p":1,"d":1,"q":2,"c":false,"source":"auto-style"},{"id":"full","label":"Full search proxy","p":3,"d":1,"q":1,"c":false,"source":"full-search style"}]},{"id":"us_consumption","name":"US consumption-style quarterly change","frequency":"Quarterly","value_label":"Consumption change","labels":["2005 Q1","2005 Q2","2005 Q3","2005 Q4","2006 Q1","2006 Q2","2006 Q3","2006 Q4","2007 Q1","2007 Q2","2007 Q3","2007 Q4","2008 Q1","2008 Q2","2008 Q3","2008 Q4","2009 Q1","2009 Q2","2009 Q3","2009 Q4","2010 Q1","2010 Q2","2010 Q3","2010 Q4","2011 Q1","2011 Q2","2011 Q3","2011 Q4","2012 Q1","2012 Q2","2012 Q3","2012 Q4","2013 Q1","2013 Q2","2013 Q3","2013 Q4","2014 Q1","2014 Q2","2014 Q3","2014 Q4","2015 Q1","2015 Q2","2015 Q3","2015 Q4","2016 Q1","2016 Q2","2016 Q3","2016 Q4","2017 Q1","2017 Q2","2017 Q3","2017 Q4","2018 Q1","2018 Q2","2018 Q3","2018 Q4","2019 Q1","2019 Q2","2019 Q3","2019 Q4","2020 Q1","2020 Q2","2020 Q3","2020 Q4","2021 Q1","2021 Q2","2021 Q3","2021 Q4","2022 Q1","2022 Q2","2022 Q3","2022 Q4","2023 Q1","2023 Q2","2023 Q3","2023 Q4"],"values":[91.581,91.232,94.613,95.167,94.3,95.012,98.02,98.665,95.848,96.625,97.882,98.729,99.669,99.585,99.874,102.481,99.632,100.147,101.671,103.519,100.544,102.421,103.199,104.163,105.832,103.666,104.741,105.466,104.219,105.939,106.429,107.673,107.866,106.191,109.131,109.297,108.645,110.866,111.493,112.647,111.855,113.543,113.479,114.186,115.676,115.293,114.74,117.045,115.978,117.676,118.712,117.867,119.97,121.816,120.655,123.54,120.667,123.845,125.378,126.212,125.235,127.01,128.495,129.665,127.766,131.564,132.376,132.778,132.74,134.65,134.11,134.714,135.725,137.228,137.995,137.818],"future_labels":["2024 Q1","2024 Q2","2024 Q3","2024 Q4","2025 Q1","2025 Q2","2025 Q3","2025 Q4","2026 Q1","2026 Q2","2026 Q3","2026 Q4","2027 Q1","2027 Q2","2027 Q3","2027 Q4","2028 Q1","2028 Q2","2028 Q3","2028 Q4","2029 Q1","2029 Q2","2029 Q3","2029 Q4"],"candidates":[{"id":"ar2","label":"Manual ARIMA(2,0,0)+c","p":2,"d":0,"q":0,"c":true,"source":"week8 first try"},{"id":"ar3","label":"Manual ARIMA(3,0,0)+c","p":3,"d":0,"q":0,"c":true,"source":"week8 corrected AR"},{"id":"ma3","label":"Manual ARIMA(0,0,3)+c","p":0,"d":0,"q":3,"c":true,"source":"week8 alternative MA"},{"id":"auto","label":"Auto ARIMA proxy","p":3,"d":0,"q":0,"c":true,"source":"auto-style"}]},{"id":"mink_style","name":"Mink-style annual cycle","frequency":"Yearly","value_label":"Minks trapped","labels":["1845","1846","1847","1848","1849","1850","1851","1852","1853","1854","1855","1856","1857","1858","1859","1860","1861","1862","1863","1864","1865","1866","1867","1868","1869","1870","1871","1872","1873","1874","1875","1876","1877","1878","1879","1880","1881","1882","1883","1884","1885","1886","1887","1888","1889","1890","1891","1892","1893","1894","1895","1896","1897","1898","1899","1900","1901","1902","1903","1904","1905","1906"],"values":[38,45,55,70,82,95,88,62,40,28,18,22,33,48,70,91,105,96,72,48,31,20,24,38,59,82,112,121,101,73,49,35,26,30,44,64,90,117,128,103,78,55,37,27,31,47,69,96,122,131,108,84,58,39,29,34,52,76,101,126,111,86],"future_labels":["1907","1908","1909","1910","1911","1912","1913","1914","1915","1916","1917","1918","1919","1920","1921","1922","1923","1924","1925","1926","1927","1928","1929","1930"],"candidates":[{"id":"ar4","label":"Manual ARIMA(4,0,0)+c","p":4,"d":0,"q":0,"c":true,"source":"week8 manual cycle"},{"id":"auto","label":"Auto ARIMA proxy","p":2,"d":0,"q":1,"c":true,"source":"auto-style"},{"id":"full","label":"Full search proxy","p":5,"d":0,"q":1,"c":true,"source":"full-search style"},{"id":"rw","label":"Random walk ARIMA(0,1,0)","p":0,"d":1,"q":0,"c":false,"source":"baseline"}]}]};
+const SAMPLE = {"schema_version":"v6-teaching-proxy","note":"Teaching proxy data for live ARIMA levers. Replace with exact fable output when available.","datasets":[{"id":"egypt_style","name":"Egypt-style yearly exports","frequency":"Yearly","value_label":"Exports","labels":["1982","1983","1984","1985","1986","1987","1988","1989","1990","1991","1992","1993","1994","1995","1996","1997","1998","1999","2000","2001","2002","2003","2004","2005","2006","2007","2008","2009","2010","2011","2012","2013","2014","2015","2016","2017","2018","2019","2020","2021","2022","2023"],"values":[53.739,55.145,59.977,64.671,61.436,63.049,69.702,68.649,65.563,70.04,66.899,67.068,70.068,63.927,66.409,70.175,68.205,73.272,70.163,69.586,83.575,80.715,83.112,78.439,83.022,88.166,84.955,89.318,85.753,87.552,92.802,97.021,91.405,98.392,95.194,97.422,101.053,98.263,101.428,107.411,109.746,111.239],"future_labels":["2024","2025","2026","2027","2028","2029","2030","2031","2032","2033","2034","2035","2036","2037","2038","2039","2040","2041","2042","2043","2044","2045","2046","2047"],"candidates":[{"transform":"none","p":2,"d":0,"q":1,"P":0,"D":0,"Q":0,"period":0,"c":true,"id":"auto","label":"Auto ARIMA proxy","source":"auto-style"},{"transform":"none","p":4,"d":0,"q":0,"P":0,"D":0,"Q":0,"period":0,"c":true,"id":"ar4","label":"Manual ARIMA(4,0,0)+c","source":"class manual AR example"},{"transform":"none","p":0,"d":1,"q":0,"P":0,"D":0,"Q":0,"period":0,"c":false,"id":"rw","label":"Random walk ARIMA(0,1,0)","source":"baseline"},{"transform":"none","p":0,"d":0,"q":1,"P":0,"D":0,"Q":0,"period":0,"c":true,"id":"ma1","label":"MA proxy ARIMA(0,0,1)+c","source":"candidate"}],"lesson_focus":"non-seasonal arima","default_transform":"none","seasonal_period":0,"study_focus":["pq"]},{"id":"caf_style","name":"CAF-style messy exports","frequency":"Yearly","value_label":"Exports","labels":["1960","1961","1962","1963","1964","1965","1966","1967","1968","1969","1970","1971","1972","1973","1974","1975","1976","1977","1978","1979","1980","1981","1982","1983","1984","1985","1986","1987","1988","1989","1990","1991","1992","1993","1994","1995","1996","1997","1998","1999","2000","2001","2002","2003","2004","2005","2006","2007","2008","2009","2010","2011","2012","2013"],"values":[19.8,17.6,15,17.8,18.4,17.1,16.4,16.8,11.9,13.6,13.6,13.3,12.7,13.7,20.4,18.1,17.2,21.6,19.9,26.5,30.6,31,26.3,22.9,20.7,18.2,13.9,12.6,17.4,17.8,20.4,27.5,28.4,25.9,22.6,22.5,20.8,18.8,16.2,15,16.2,17.5,18.3,21.8,28.2,30.4,29.9,30.3,33.1,25,21.4,20.6,16.4,17],"future_labels":["2014","2015","2016","2017","2018","2019","2020","2021","2022","2023","2024","2025","2026","2027","2028","2029","2030","2031","2032","2033","2034","2035","2036","2037"],"candidates":[{"transform":"none","p":2,"d":1,"q":0,"P":0,"D":0,"Q":0,"period":0,"c":false,"id":"ar210","label":"Manual ARIMA(2,1,0)","source":"class CAF candidate"},{"transform":"none","p":0,"d":1,"q":3,"P":0,"D":0,"Q":0,"period":0,"c":false,"id":"ma013","label":"Manual ARIMA(0,1,3)","source":"class CAF candidate"},{"transform":"none","p":1,"d":1,"q":2,"P":0,"D":0,"Q":0,"period":0,"c":false,"id":"auto","label":"Auto ARIMA proxy","source":"auto-style"},{"transform":"none","p":3,"d":1,"q":1,"P":0,"D":0,"Q":0,"period":0,"c":false,"id":"full","label":"Full search proxy","source":"full-search style"}],"lesson_focus":"non-seasonal arima","default_transform":"none","seasonal_period":0,"study_focus":["difference","pq"]},{"id":"us_consumption","name":"US consumption-style quarterly change","frequency":"Quarterly","value_label":"Consumption change","labels":["2005 Q1","2005 Q2","2005 Q3","2005 Q4","2006 Q1","2006 Q2","2006 Q3","2006 Q4","2007 Q1","2007 Q2","2007 Q3","2007 Q4","2008 Q1","2008 Q2","2008 Q3","2008 Q4","2009 Q1","2009 Q2","2009 Q3","2009 Q4","2010 Q1","2010 Q2","2010 Q3","2010 Q4","2011 Q1","2011 Q2","2011 Q3","2011 Q4","2012 Q1","2012 Q2","2012 Q3","2012 Q4","2013 Q1","2013 Q2","2013 Q3","2013 Q4","2014 Q1","2014 Q2","2014 Q3","2014 Q4","2015 Q1","2015 Q2","2015 Q3","2015 Q4","2016 Q1","2016 Q2","2016 Q3","2016 Q4","2017 Q1","2017 Q2","2017 Q3","2017 Q4","2018 Q1","2018 Q2","2018 Q3","2018 Q4","2019 Q1","2019 Q2","2019 Q3","2019 Q4","2020 Q1","2020 Q2","2020 Q3","2020 Q4","2021 Q1","2021 Q2","2021 Q3","2021 Q4","2022 Q1","2022 Q2","2022 Q3","2022 Q4","2023 Q1","2023 Q2","2023 Q3","2023 Q4"],"values":[91.581,91.232,94.613,95.167,94.3,95.012,98.02,98.665,95.848,96.625,97.882,98.729,99.669,99.585,99.874,102.481,99.632,100.147,101.671,103.519,100.544,102.421,103.199,104.163,105.832,103.666,104.741,105.466,104.219,105.939,106.429,107.673,107.866,106.191,109.131,109.297,108.645,110.866,111.493,112.647,111.855,113.543,113.479,114.186,115.676,115.293,114.74,117.045,115.978,117.676,118.712,117.867,119.97,121.816,120.655,123.54,120.667,123.845,125.378,126.212,125.235,127.01,128.495,129.665,127.766,131.564,132.376,132.778,132.74,134.65,134.11,134.714,135.725,137.228,137.995,137.818],"future_labels":["2024 Q1","2024 Q2","2024 Q3","2024 Q4","2025 Q1","2025 Q2","2025 Q3","2025 Q4","2026 Q1","2026 Q2","2026 Q3","2026 Q4","2027 Q1","2027 Q2","2027 Q3","2027 Q4","2028 Q1","2028 Q2","2028 Q3","2028 Q4","2029 Q1","2029 Q2","2029 Q3","2029 Q4"],"candidates":[{"transform":"none","p":2,"d":0,"q":0,"P":0,"D":0,"Q":0,"period":4,"c":true,"id":"ar2","label":"Manual ARIMA(2,0,0)+c","source":"class first try"},{"transform":"none","p":3,"d":0,"q":0,"P":0,"D":0,"Q":0,"period":4,"c":true,"id":"ar3","label":"Manual ARIMA(3,0,0)+c","source":"class corrected AR"},{"transform":"none","p":0,"d":0,"q":3,"P":0,"D":0,"Q":0,"period":4,"c":true,"id":"ma3","label":"Manual ARIMA(0,0,3)+c","source":"class alternative MA"},{"transform":"none","p":3,"d":0,"q":0,"P":0,"D":0,"Q":0,"period":4,"c":true,"id":"auto","label":"Auto ARIMA proxy","source":"auto-style"}],"lesson_focus":"non-seasonal arima","default_transform":"none","seasonal_period":4,"study_focus":["pq"]},{"id":"mink_style","name":"Mink-style annual cycle","frequency":"Yearly","value_label":"Minks trapped","labels":["1845","1846","1847","1848","1849","1850","1851","1852","1853","1854","1855","1856","1857","1858","1859","1860","1861","1862","1863","1864","1865","1866","1867","1868","1869","1870","1871","1872","1873","1874","1875","1876","1877","1878","1879","1880","1881","1882","1883","1884","1885","1886","1887","1888","1889","1890","1891","1892","1893","1894","1895","1896","1897","1898","1899","1900","1901","1902","1903","1904","1905","1906"],"values":[38,45,55,70,82,95,88,62,40,28,18,22,33,48,70,91,105,96,72,48,31,20,24,38,59,82,112,121,101,73,49,35,26,30,44,64,90,117,128,103,78,55,37,27,31,47,69,96,122,131,108,84,58,39,29,34,52,76,101,126,111,86],"future_labels":["1907","1908","1909","1910","1911","1912","1913","1914","1915","1916","1917","1918","1919","1920","1921","1922","1923","1924","1925","1926","1927","1928","1929","1930"],"candidates":[{"transform":"none","p":4,"d":0,"q":0,"P":0,"D":0,"Q":0,"period":0,"c":true,"id":"ar4","label":"Manual ARIMA(4,0,0)+c","source":"class manual cycle"},{"transform":"none","p":2,"d":0,"q":1,"P":0,"D":0,"Q":0,"period":0,"c":true,"id":"auto","label":"Auto ARIMA proxy","source":"auto-style"},{"transform":"none","p":5,"d":0,"q":1,"P":0,"D":0,"Q":0,"period":0,"c":true,"id":"full","label":"Full search proxy","source":"full-search style"},{"transform":"none","p":0,"d":1,"q":0,"P":0,"D":0,"Q":0,"period":0,"c":false,"id":"rw","label":"Random walk ARIMA(0,1,0)","source":"baseline"}],"lesson_focus":"non-seasonal arima","default_transform":"none","seasonal_period":0,"study_focus":["pq"]},{"id":"cement_stationarity","name":"Cement stationarity lab","frequency":"Quarterly","value_label":"Cement","lesson_focus":"stationarity","default_transform":"log","seasonal_period":4,"labels":["1988 Q1","1988 Q2","1988 Q3","1988 Q4","1989 Q1","1989 Q2","1989 Q3","1989 Q4","1990 Q1","1990 Q2","1990 Q3","1990 Q4","1991 Q1","1991 Q2","1991 Q3","1991 Q4","1992 Q1","1992 Q2","1992 Q3","1992 Q4","1993 Q1","1993 Q2","1993 Q3","1993 Q4","1994 Q1","1994 Q2","1994 Q3","1994 Q4","1995 Q1","1995 Q2","1995 Q3","1995 Q4","1996 Q1","1996 Q2","1996 Q3","1996 Q4","1997 Q1","1997 Q2","1997 Q3","1997 Q4","1998 Q1","1998 Q2","1998 Q3","1998 Q4","1999 Q1","1999 Q2","1999 Q3","1999 Q4","2000 Q1","2000 Q2","2000 Q3","2000 Q4","2001 Q1","2001 Q2","2001 Q3","2001 Q4","2002 Q1","2002 Q2","2002 Q3","2002 Q4","2003 Q1","2003 Q2","2003 Q3","2003 Q4","2004 Q1","2004 Q2","2004 Q3","2004 Q4","2005 Q1","2005 Q2","2005 Q3","2005 Q4","2006 Q1","2006 Q2","2006 Q3","2006 Q4","2007 Q1","2007 Q2","2007 Q3","2007 Q4","2008 Q1","2008 Q2","2008 Q3","2008 Q4","2009 Q1","2009 Q2","2009 Q3","2009 Q4","2010 Q1","2010 Q2","2010 Q3","2010 Q4","2011 Q1","2011 Q2","2011 Q3","2011 Q4","2012 Q1","2012 Q2","2012 Q3","2012 Q4","2013 Q1","2013 Q2","2013 Q3","2013 Q4"],"values":[108.6,129.24,142.69,125.81,125.46,144.58,156.15,137.22,134.89,142.41,152.75,133.19,130.92,149.05,160.71,142.91,142.63,162.81,166.4,150.05,150.67,171.08,184.14,166.71,165.75,184.24,195.24,165.96,163.36,180.7,191.18,171.96,170.17,188.9,201.18,183.98,174.32,194.85,208.5,192.1,192.47,212.46,224.95,206.9,205.32,213.35,223.93,204.31,201.66,219.17,230.01,211.29,210.11,229.47,232.45,215.73,216.29,236.95,250.53,233.85,233.76,253.18,265.05,236.48,234.36,251.89,262.26,242.62,240.17,258.07,269.43,251.33,240.87,260.82,274.15,257.74,258.4,278.94,292.21,275.06,274.4,283.28,294.54,275.35,272.85,290.21,300.59,281.18,279.14,297.58,299.66,282.18,282.19,302.58,316.19,299.84,300.36,320.57,333.35,305.7,304.4,322.59,333.35,313.81],"future_labels":["2014 Q1","2014 Q2","2014 Q3","2014 Q4","2015 Q1","2015 Q2","2015 Q3","2015 Q4","2016 Q1","2016 Q2","2016 Q3","2016 Q4","2017 Q1","2017 Q2","2017 Q3","2017 Q4","2018 Q1","2018 Q2","2018 Q3","2018 Q4","2019 Q1","2019 Q2","2019 Q3","2019 Q4"],"candidates":[{"id":"seasonal_diff","label":"Log + seasonal difference","transform":"log","p":0,"d":0,"q":1,"P":0,"D":1,"Q":1,"period":4,"c":false,"source":"class stationarity"},{"id":"double_diff","label":"Log + seasonal + first difference","transform":"log","p":1,"d":1,"q":1,"P":0,"D":1,"Q":1,"period":4,"c":false,"source":"class double differencing"},{"id":"too_plain","label":"No transform baseline","transform":"none","p":1,"d":0,"q":0,"P":0,"D":0,"Q":0,"period":4,"c":true,"source":"contrast"}],"study_focus":["difference","seasonal"]},{"id":"h02_seasonal","name":"H02 seasonal ARIMA lab","frequency":"Monthly","value_label":"Cost","lesson_focus":"seasonal arima","default_transform":"log","seasonal_period":12,"labels":["2000-01","2000-02","2000-03","2000-04","2000-05","2000-06","2000-07","2000-08","2000-09","2000-10","2000-11","2000-12","2001-01","2001-02","2001-03","2001-04","2001-05","2001-06","2001-07","2001-08","2001-09","2001-10","2001-11","2001-12","2002-01","2002-02","2002-03","2002-04","2002-05","2002-06","2002-07","2002-08","2002-09","2002-10","2002-11","2002-12","2003-01","2003-02","2003-03","2003-04","2003-05","2003-06","2003-07","2003-08","2003-09","2003-10","2003-11","2003-12","2004-01","2004-02","2004-03","2004-04","2004-05","2004-06","2004-07","2004-08","2004-09","2004-10","2004-11","2004-12","2005-01","2005-02","2005-03","2005-04","2005-05","2005-06","2005-07","2005-08","2005-09","2005-10","2005-11","2005-12","2006-01","2006-02","2006-03","2006-04","2006-05","2006-06","2006-07","2006-08","2006-09","2006-10","2006-11","2006-12","2007-01","2007-02","2007-03","2007-04","2007-05","2007-06","2007-07","2007-08","2007-09","2007-10","2007-11","2007-12","2008-01","2008-02","2008-03","2008-04","2008-05","2008-06","2008-07","2008-08","2008-09","2008-10","2008-11","2008-12","2009-01","2009-02","2009-03","2009-04","2009-05","2009-06","2009-07","2009-08","2009-09","2009-10","2009-11","2009-12","2010-01","2010-02","2010-03","2010-04","2010-05","2010-06","2010-07","2010-08","2010-09","2010-10","2010-11","2010-12","2011-01","2011-02","2011-03","2011-04","2011-05","2011-06","2011-07","2011-08","2011-09","2011-10","2011-11","2011-12","2012-01","2012-02","2012-03","2012-04","2012-05","2012-06","2012-07","2012-08","2012-09","2012-10","2012-11","2012-12","2013-01","2013-02","2013-03","2013-04","2013-05","2013-06","2013-07","2013-08","2013-09","2013-10","2013-11","2013-12","2014-01","2014-02","2014-03","2014-04","2014-05","2014-06","2014-07","2014-08","2014-09","2014-10","2014-11","2014-12","2015-01","2015-02","2015-03","2015-04","2015-05","2015-06","2015-07","2015-08","2015-09","2015-10","2015-11","2015-12","2016-01","2016-02","2016-03","2016-04","2016-05","2016-06","2016-07","2016-08","2016-09","2016-10","2016-11","2016-12","2017-01","2017-02","2017-03","2017-04","2017-05","2017-06","2017-07","2017-08","2017-09","2017-10","2017-11","2017-12","2018-01","2018-02","2018-03","2018-04","2018-05","2018-06","2018-07","2018-08","2018-09","2018-10","2018-11","2018-12","2019-01","2019-02","2019-03","2019-04","2019-05","2019-06","2019-07","2019-08","2019-09","2019-10","2019-11","2019-12","2020-01","2020-02","2020-03","2020-04","2020-05","2020-06","2020-07","2020-08","2020-09","2020-10","2020-11","2020-12","2021-01","2021-02","2021-03","2021-04","2021-05","2021-06","2021-07","2021-08","2021-09","2021-10","2021-11","2021-12","2022-01","2022-02","2022-03","2022-04","2022-05","2022-06","2022-07","2022-08","2022-09","2022-10","2022-11","2022-12","2023-01","2023-02","2023-03","2023-04","2023-05","2023-06","2023-07","2023-08","2023-09","2023-10","2023-11","2023-12"],"values":[18,16.71,16.14,17.58,19.6,21.85,23.55,22.6,20.86,19.85,19.22,25.3,19.9,18.44,17.75,19.29,21.45,23.83,25.61,24.5,22.53,21.37,20.62,27.04,21.2,19.57,18.77,20.32,22.51,24.92,26.69,25.44,23.31,22.04,21.19,27.7,21.65,19.92,19.05,20.56,22.72,25.09,26.81,25.49,23.32,22,21.12,27.57,21.52,19.78,18.91,20.39,22.53,24.87,26.57,25.28,23.13,21.85,20.99,27.43,21.44,19.74,18.9,20.43,22.61,25.03,26.81,25.57,23.46,22.22,21.41,28.06,22.01,20.32,19.52,21.17,23.51,26.1,28.04,26.83,24.69,23.45,22.67,29.79,23.42,21.68,20.87,22.68,25.24,28.07,30.2,28.94,26.67,25.36,24.53,32.25,25.36,23.49,22.61,24.57,27.33,30.37,32.66,31.27,28.78,27.33,26.4,34.66,27.21,25.15,24.17,26.2,29.08,32.25,34.6,33.04,30.34,28.74,27.68,36.25,28.39,26.17,25.08,27.11,30.01,33.2,35.52,33.83,30.98,29.28,28.14,36.76,28.72,26.42,25.27,27.27,30.13,33.27,35.54,33.8,30.92,29.18,28.02,36.57,28.56,26.26,25.1,27.09,29.93,33.05,35.33,33.61,30.77,29.07,27.94,36.51,28.54,26.28,25.17,27.2,30.11,33.32,35.68,34.03,31.21,29.55,28.47,37.3,29.23,26.98,25.9,28.06,31.14,34.54,37.07,35.43,32.58,30.91,29.84,39.16,30.75,28.43,27.34,29.66,32.96,36.6,39.33,37.63,34.62,32.87,31.74,41.67,32.72,30.26,29.09,31.55,35.04,38.89,41.76,39.92,36.69,34.79,33.56,44,34.5,31.85,30.57,33.1,36.7,40.65,43.57,41.56,38.12,36.08,34.73,45.44,35.55,32.75,31.36,33.89,37.49,41.45,44.33,42.21,38.64,36.5,35.07,45.81,35.78,32.91,31.47,33.96,37.52,41.43,44.27,42.11,38.52,36.36,34.92,45.58,35.6,32.74,31.3,33.79,37.34,41.24,44.09,41.96,38.42,36.3,34.89,45.6,35.66,32.84,31.44,33.99,37.62,41.63,44.58,42.51,38.99,36.91,35.55,46.55,36.47,33.65,32.29,34.97,38.78,42.99,46.13,44.06,40.48,38.38,37.02,48.56,38.09,35.19,33.8,36.65,40.68,45.14,48.46,46.31,42.57,40.38,38.96,51.09],"future_labels":["2024-01","2024-02","2024-03","2024-04","2024-05","2024-06","2024-07","2024-08","2024-09","2024-10","2024-11","2024-12","2025-01","2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03","2026-04","2026-05","2026-06","2026-07","2026-08","2026-09","2026-10","2026-11","2026-12"],"candidates":[{"id":"seasonal_ar","label":"Seasonal ARIMA(3,0,0)(2,1,0)[12]","transform":"log","p":3,"d":0,"q":0,"P":2,"D":1,"Q":0,"period":12,"c":true,"source":"seasonal H02 first guess"},{"id":"seasonal_ma","label":"Seasonal ARIMA(3,0,1)(0,1,2)[12]","transform":"log","p":3,"d":0,"q":1,"P":0,"D":1,"Q":2,"period":12,"c":false,"source":"seasonal plausible alternative"},{"id":"auto_style","label":"Auto seasonal proxy","transform":"log","p":1,"d":1,"q":1,"P":0,"D":1,"Q":1,"period":12,"c":false,"source":"seasonal auto-style"}],"study_focus":["seasonal"]}]};
 let APP_DATA = SAMPLE;
-let mode = "candidate";
+let mode = "manual";
 let activeView = "explore";
 
 const el = id => document.getElementById(id);
-const controls = ["dataset","candidate","p","d","q","constant","horizon"];
+const controls = ["studyFocus","dataset","candidate","logTransform","d","seasonalDifference","period","p","q","P","Q","constant","horizon"];
 
 async function tryLoadJSON(){
   try {
@@ -207,22 +264,91 @@ async function tryLoadJSON(){
   }
 }
 
+function studyFocus(){ return el("studyFocus")?.value || "pq"; }
+function datasetFocuses(ds){ return ds.study_focus || ["pq"]; }
 function datasets() { return APP_DATA.datasets || SAMPLE.datasets; }
-function currentDataset() { return datasets().find(d => d.id === el("dataset").value) || datasets()[0]; }
+function visibleDatasets() {
+  const focus=studyFocus();
+  return datasets().filter(ds => datasetFocuses(ds).includes(focus));
+}
+function currentDataset() { return visibleDatasets().find(d => d.id === el("dataset").value) || visibleDatasets()[0] || datasets()[0]; }
+function seasonalPeriod(ds){ return +(ds.seasonal_period || 0); }
+function isSeasonal(ds){ return seasonalPeriod(ds) > 1; }
+function usesLog(params){ return params.transform === "log"; }
+function isSeasonalFocus(){ return studyFocus() === "seasonal"; }
 
 function candidateParams(ds){
-  const cand = ds.candidates.find(c => c.id === el("candidate").value) || ds.candidates[0];
-  return {...cand, candidate_id:cand.id};
+  const cand = visibleCandidates(ds).find(c => c.id === el("candidate").value) || visibleCandidates(ds)[0] || ds.candidates[0];
+  return normalizeParams({
+    ...cand,
+    candidate_id:cand.id,
+    transform:el("logTransform").checked ? "log" : "none",
+    d:+el("d").value,
+    D:isSeasonal(ds) && el("seasonalDifference").checked ? 1 : 0,
+    period:isSeasonalFocus() ? +el("period").value : seasonalPeriod(ds)
+  });
 }
 function manualParams(){
-  return {id:"manual",label:"Manual model",p:+el("p").value,d:+el("d").value,q:+el("q").value,c:el("constant").checked,source:"manual"};
+  const ds=currentDataset();
+  return normalizeParams({
+    id:"manual", label:"Manual model", source:"manual",
+    transform:el("logTransform").checked ? "log" : "none",
+    p:+el("p").value, d:+el("d").value, q:+el("q").value,
+    P:isSeasonalFocus() ? +el("P").value : 0,
+    D:isSeasonal(ds) && el("seasonalDifference").checked ? 1 : 0,
+    Q:isSeasonalFocus() ? +el("Q").value : 0,
+    period:isSeasonalFocus() ? +el("period").value : seasonalPeriod(ds),
+    c:el("constant").checked
+  });
 }
 function currentParams() { return mode === "candidate" ? candidateParams(currentDataset()) : manualParams(); }
+
+function normalizeParams(params){
+  return {
+    ...params,
+    transform:params.transform || "none",
+    p:+(params.p || 0), d:+(params.d || 0), q:+(params.q || 0),
+    P:+(params.P || 0), D:+(params.D || 0), Q:+(params.Q || 0),
+    period:+(params.period || 0), c:!!params.c
+  };
+}
+
+function applyCandidateToControls(){
+  const ds=currentDataset();
+  const cand=normalizeParams(visibleCandidates(ds).find(c=>c.id===el("candidate").value) || visibleCandidates(ds)[0] || {});
+  el("logTransform").checked = cand.transform === "log";
+  el("d").value = cand.d;
+  el("seasonalDifference").checked = !!cand.D;
+  el("period").value = String(cand.period || seasonalPeriod(ds) || 0);
+  el("p").value = cand.p;
+  el("q").value = cand.q;
+  el("P").value = cand.P;
+  el("Q").value = cand.Q;
+  el("constant").checked = cand.c;
+}
+
+function transformedValues(ds, params){
+  const values = usesLog(params) ? ds.values.map(v => Math.log(Math.max(v, 1e-6))) : ds.values.slice();
+  return values;
+}
 
 function diff(arr, d){
   let x = arr.slice();
   for(let k=0;k<d;k++){ const y=[]; for(let i=1;i<x.length;i++) y.push(x[i]-x[i-1]); x=y; }
   return x;
+}
+function seasonalDiff(arr,D,period){
+  let x=arr.slice();
+  if(!period || period < 2) return x;
+  for(let k=0;k<D;k++){ const y=[]; for(let i=period;i<x.length;i++) y.push(x[i]-x[i-period]); x=y; }
+  return x;
+}
+function prepareSeries(ds, params){
+  const base=transformedValues(ds,params);
+  const seasonal=seasonalDiff(base,params.D,params.period);
+  const work=diff(seasonal,params.d);
+  const drop=base.length-work.length;
+  return {base,work,labels:ds.labels.slice(drop)};
 }
 function mean(x){return x.reduce((a,b)=>a+b,0)/Math.max(1,x.length)}
 function sd(x){const m=mean(x); return Math.sqrt(mean(x.map(v=>(v-m)*(v-m))) || 1)}
@@ -256,25 +382,47 @@ function fitAR(x,p,useC){
   return {intercept,phi,fitted,residuals,sigma:sd(residuals)};
 }
 
-function forecastApprox(values,p,d,q,c,horizon){
-  const work=diff(values,d), fitted=fitAR(work,p,c), history=work.slice(), residuals=fitted.residuals.slice(), workForecast=[];
+function forecastApprox(ds,params,horizon){
+  const prepared=prepareSeries(ds,params);
+  const pEff=Math.min(Math.max(params.p, params.P ? params.P * Math.max(1,params.period) : 0), Math.max(0, prepared.work.length - 2));
+  const qEff=params.q + params.Q;
+  const fitted=fitAR(prepared.work,pEff,params.c), history=prepared.work.slice(), residuals=fitted.residuals.slice(), workForecast=[];
   for(let h=1;h<=horizon;h++){
     let pred=fitted.intercept;
-    for(let j=1;j<=p;j++) pred+=(fitted.phi[j-1]||0)*(history[history.length-j] ?? history.at(-1) ?? 0);
-    let shock=0; for(let j=1;j<=q;j++) shock+=(residuals[residuals.length-j]||0)*Math.pow(.55,j);
+    for(let j=1;j<=pEff;j++) pred+=(fitted.phi[j-1]||0)*(history[history.length-j] ?? history.at(-1) ?? 0);
+    let shock=0; for(let j=1;j<=qEff;j++) shock+=(residuals[residuals.length-j]||0)*Math.pow(.55,j);
     pred += shock*Math.pow(.58,h);
     workForecast.push(pred); history.push(pred); residuals.push(0);
   }
-  const fc=[];
-  if(d===0) fc.push(...workForecast);
-  else if(d===1){ let level=values.at(-1); for(const ch of workForecast){ level+=ch; fc.push(level); } }
-  else { let level=values.at(-1), lastDiff=values.at(-1)-values.at(-2); for(const a of workForecast){ lastDiff+=a; level+=lastDiff; fc.push(level); } }
-  const sigma=fitted.sigma||sd(work), lower80=[],upper80=[],lower95=[],upper95=[];
-  for(let i=0;i<horizon;i++){ const step=i+1; let growth;
-    if(d===0) growth=Math.sqrt(1+.10*step+.08*(p+q)); else if(d===1) growth=Math.sqrt(step)*(1+.04*q); else growth=Math.pow(step,1.16)*(.75+.04*q);
-    const se=sigma*growth; lower80.push(fc[i]-1.28*se); upper80.push(fc[i]+1.28*se); lower95.push(fc[i]-1.96*se); upper95.push(fc[i]+1.96*se);
+  let seasonalForecast=[];
+  if(params.d===0) seasonalForecast=workForecast.slice();
+  else if(params.d===1){
+    const seasonalHistory=seasonalDiff(prepared.base,params.D,params.period);
+    let level=seasonalHistory.at(-1) || 0;
+    for(const ch of workForecast){ level+=ch; seasonalForecast.push(level); }
+  } else {
+    const seasonalHistory=seasonalDiff(prepared.base,params.D,params.period);
+    let level=seasonalHistory.at(-1) || 0, lastDiff=(seasonalHistory.at(-1) || 0) - (seasonalHistory.at(-2) || 0);
+    for(const a of workForecast){ lastDiff+=a; level+=lastDiff; seasonalForecast.push(level); }
   }
-  return {forecast:fc,lower80,upper80,lower95,upper95,sigma,work,residuals:fitted.residuals};
+  let baseForecast=[];
+  if(params.D && params.period > 1){
+    const baseHistory=prepared.base.slice();
+    for(const v of seasonalForecast){
+      const next=v+(baseHistory[baseHistory.length-params.period] ?? baseHistory.at(-1) ?? 0);
+      baseHistory.push(next); baseForecast.push(next);
+    }
+  } else {
+    baseForecast=seasonalForecast;
+  }
+  const fc=usesLog(params) ? baseForecast.map(v=>Math.exp(v)) : baseForecast;
+  const sigma=fitted.sigma||sd(prepared.work), lower80=[],upper80=[],lower95=[],upper95=[];
+  for(let i=0;i<horizon;i++){ const step=i+1; let growth;
+    if(params.d===0 && params.D===0) growth=Math.sqrt(1+.10*step+.08*(params.p+params.q+params.P+params.Q)); else if(params.d+params.D===1) growth=Math.sqrt(step)*(1+.04*qEff); else growth=Math.pow(step,1.16)*(.75+.04*qEff);
+    const se=sigma*growth*(usesLog(params) ? Math.max(1,fc[i])*.08 : 1);
+    lower80.push(fc[i]-1.28*se); upper80.push(fc[i]+1.28*se); lower95.push(fc[i]-1.96*se); upper95.push(fc[i]+1.96*se);
+  }
+  return {forecast:fc,lower80,upper80,lower95,upper95,sigma,work:prepared.work,residuals:fitted.residuals,labels:prepared.labels,prepared};
 }
 
 function acf(x,maxLag=17){
@@ -296,13 +444,38 @@ function pacfSimple(x,maxLag=17){
   return out.map(v=>Math.max(-1,Math.min(1,v)));
 }
 function modelScore(ds, params){
-  const result=forecastApprox(ds.values,params.p,params.d,params.q,params.c,Math.min(12,ds.future_labels.length));
-  const n=Math.max(1,result.work.length), k=params.p+params.q+(params.c?1:0)+1;
+  const result=forecastApprox(ds,params,Math.min(12,ds.future_labels.length));
+  const n=Math.max(1,result.work.length), k=params.p+params.q+params.P+params.Q+(params.c?1:0)+1;
   const rss=result.residuals.reduce((a,v)=>a+v*v,0)||1;
   const aic=n*Math.log(rss/n)+2*k;
   const aicc=aic+(2*k*(k+1))/Math.max(1,n-k-1);
   const bic=n*Math.log(rss/n)+Math.log(n)*k;
   return {aicc,bic,sigma:result.sigma};
+}
+
+function visibleCandidates(ds){
+  const candidates=ds.candidates || [];
+  if(isSeasonalFocus()) return candidates;
+  return candidates.filter(c => c.id !== "full" && !String(c.source || "").includes("full-search"));
+}
+
+function friendlyCandidateLabel(candidate){
+  if(isSeasonalFocus()) return candidate.label;
+  const map={
+    auto:"Auto ARIMA",
+    ar4:"Manual ARIMA(4,0,0)",
+    rw:"Random walk",
+    ma1:"MA-style model",
+    ar210:"Manual ARIMA(2,1,0)",
+    ma013:"Manual ARIMA(0,1,3)",
+    ar2:"Manual ARIMA(2,0,0)",
+    ar3:"Manual ARIMA(3,0,0)",
+    ma3:"Manual ARIMA(0,0,3)",
+    seasonal_diff:"Log + seasonal difference",
+    double_diff:"Log + seasonal + first difference",
+    too_plain:"No transform baseline"
+  };
+  return map[candidate.id] || candidate.label;
 }
 
 function make(tag,attrs={},parent=null){const node=document.createElementNS("http://www.w3.org/2000/svg",tag); for(const [k,v] of Object.entries(attrs)) node.setAttribute(k,v); if(parent) parent.appendChild(node); return node}
@@ -323,7 +496,7 @@ function drawSeries(id,values,labels,yLabel,H=240){
 }
 
 function drawForecast(ds,result,horizon){
-  const svg=el("forecastSvg"), W=920,H=350,m={left:58,right:18,top:15,bottom:40}, iw=W-m.left-m.right, ih=H-m.top-m.bottom;
+  const svg=el("forecastSvg"), W=920,H=255,m={left:58,right:18,top:12,bottom:34}, iw=W-m.left-m.right, ih=H-m.top-m.bottom;
   const hist=ds.values, fc=result.forecast, all=hist.concat(fc,result.lower95,result.upper95).filter(Number.isFinite); let lo=Math.min(...all), hi=Math.max(...all), pad=(hi-lo)*.12||1; lo-=pad; hi+=pad;
   const total=hist.length+horizon, x=i=>m.left+i/Math.max(1,total-1)*iw, y=v=>m.top+(hi-v)/(hi-lo)*ih;
   const yTicks=ticks(lo,hi,5).map(v=>({v,y:y(v)})), xTicks=[]; for(let j=0;j<6;j++){const i=Math.round(j*(total-1)/5); const label=i<hist.length?ds.labels[i]:ds.future_labels[i-hist.length]; xTicks.push({i,x:x(i),label})}
@@ -342,62 +515,102 @@ function drawBars(id,vals,label,H=200){
 }
 
 function drawHistogram(id,vals){
-  const svg=el(id), W=440,H=210,m={left:52,right:14,top:14,bottom:36}; clear(svg);
+  const svg=el(id), W=440,H=145,m={left:52,right:14,top:10,bottom:30}; clear(svg);
   const nBins=9, lo=Math.min(...vals), hi=Math.max(...vals), span=hi-lo||1, bins=Array(nBins).fill(0); vals.forEach(v=>{let idx=Math.floor((v-lo)/span*nBins); idx=Math.max(0,Math.min(nBins-1,idx)); bins[idx]++});
   const maxC=Math.max(...bins,1), x=i=>m.left+i/nBins*(W-m.left-m.right), y=c=>m.top+(maxC-c)/maxC*(H-m.top-m.bottom);
   const yTicks=ticks(0,maxC,4).map(v=>({v,y:y(v)})), xTicks=[0,Math.floor(nBins/2),nBins].map(i=>({x:x(i),label:i===0?lo.toFixed(1):i===nBins?hi.toFixed(1):((lo+hi)/2).toFixed(1)}));
   ggBase(svg,W,H,m,yTicks,xTicks); yTicks.forEach(t=>make("text",{x:m.left-9,y:t.y+4,"text-anchor":"end",fill:"#555","font-size":12},svg).textContent=Math.round(t.v).toString()); xTicks.forEach(t=>make("text",{x:t.x,y:H-12,"text-anchor":"middle",fill:"#555","font-size":12},svg).textContent=t.label);
   bins.forEach((c,i)=>make("rect",{x:x(i)+2,y:y(c),width:(W-m.left-m.right)/nBins-4,height:H-m.bottom-y(c),fill:"#5f5f5f"},svg)); make("text",{x:20,y:H/2,fill:"#222","font-size":14,transform:`rotate(-90 20 ${H/2})`},svg).textContent="count"; make("text",{x:W/2,y:H-2,fill:"#222","font-size":13,"text-anchor":"middle"},svg).textContent="residual";
 }
-function modelName(p,d,q,c){return `ARIMA(${p},${d},${q})${c?" + c":""}`}
+function modelName(params){
+  if(!isSeasonalFocus()){
+    const simple = `${usesLog(params) ? "log " : ""}ARIMA(${params.p},${params.d},${params.q})${params.c ? " + c" : ""}`;
+    return params.D ? `${simple} + seasonal difference` : simple;
+  }
+  const seasonal = params.period > 1 ? `(${params.P},${params.D},${params.Q})[${params.period}]` : "";
+  const prefix = usesLog(params) ? "log " : "";
+  return `${prefix}ARIMA(${params.p},${params.d},${params.q})${seasonal}${params.c?" + c":""}`;
+}
 
 function updateCandidates(){
   const ds=currentDataset(), sel=el("candidate"); const existing=sel.value; sel.innerHTML="";
-  ds.candidates.forEach(c=>{const opt=document.createElement("option"); opt.value=c.id; opt.textContent=c.label; sel.appendChild(opt);});
-  if(ds.candidates.some(c=>c.id===existing)) sel.value=existing;
+  const candidates=visibleCandidates(ds);
+  candidates.forEach(c=>{const opt=document.createElement("option"); opt.value=c.id; opt.textContent=friendlyCandidateLabel(c); sel.appendChild(opt);});
+  if(candidates.some(c=>c.id===existing)) sel.value=existing;
+  else if(candidates[0]) sel.value=candidates[0].id;
 }
-function setMode(next){mode=next; el("candidateMode").classList.toggle("active",mode==="candidate"); el("manualMode").classList.toggle("active",mode==="manual"); el("candidateControls").style.display=mode==="candidate"?"block":"none"; el("manualControls").classList.toggle("active",mode==="manual"); update();}
+function refreshDatasets(){
+  const select=el("dataset"), existing=select.value;
+  select.innerHTML="";
+  visibleDatasets().forEach(ds=>{const opt=document.createElement("option"); opt.value=ds.id; opt.textContent=`${ds.name} (${ds.frequency})`; select.appendChild(opt);});
+  if(visibleDatasets().some(ds=>ds.id===existing)) select.value=existing;
+  else if(visibleDatasets()[0]) select.value=visibleDatasets()[0].id;
+}
+function setMode(next){mode=next; el("candidateMode").classList.toggle("active",mode==="candidate"); el("manualMode").classList.toggle("active",mode==="manual"); el("candidateControls").style.display=mode==="candidate"?"block":"none"; el("manualControls").classList.toggle("active",mode==="manual"); if(mode==="candidate") applyCandidateToControls(); update();}
 function setView(view){activeView=view; el("exploreTab").classList.toggle("active",view==="explore"); el("checkTab").classList.toggle("active",view==="check"); el("exploreView").classList.toggle("active",view==="explore"); el("checkView").classList.toggle("active",view==="check");}
 
 function renderComparison(ds, selected){
-  const rows=ds.candidates.map(c=>{const score=modelScore(ds,c); return {...c,...score}}).sort((a,b)=>a.aicc-b.aicc);
+  const activePrep = {
+    transform:selected.transform,
+    d:selected.d,
+    D:selected.D,
+    period:selected.period
+  };
+  const rows=visibleCandidates(ds).map(c=>{const params=normalizeParams({...c,...activePrep}); const score=modelScore(ds,params); return {...params,label:friendlyCandidateLabel(params),...score}}).sort((a,b)=>a.aicc-b.aicc);
   const bestId=rows[0]?.id;
   const selectedId = mode==="candidate" ? selected.id : "manual";
   const manualRow = mode==="manual" ? [{id:"manual",label:"Manual current",...selected,...modelScore(ds,selected)}] : [];
   const finalRows = manualRow.concat(rows);
-  el("comparisonTable").innerHTML = `<table><thead><tr><th>Model</th><th>AICc-style</th><th>BIC-style</th><th>Source</th></tr></thead><tbody>${finalRows.map(r=>`<tr class="${r.id===selectedId?"selected":""} ${r.id===bestId?"best":""}"><td>${r.label || modelName(r.p,r.d,r.q,r.c)}<br><span class="tiny">${modelName(r.p,r.d,r.q,r.c)}</span></td><td>${r.aicc.toFixed(2)}</td><td>${r.bic.toFixed(2)}</td><td>${r.source||""}</td></tr>`).join("")}</tbody></table><p class="tiny">This table is a teaching proxy until replaced by real <code>glance()</code> AICc/BIC from R/fable.</p>`;
+  const mixed=finalRows.some(r=>r.transform!==selected.transform || r.d!==selected.d || r.D!==selected.D);
+  el("comparisonTable").innerHTML = `<p class="tiny"><span class="tag warn">teaching proxy</span> AICc/BIC values are browser approximations, not real <code>glance()</code> output.</p><table><thead><tr><th>Model</th><th>AICc-style</th><th>BIC-style</th><th>Source</th></tr></thead><tbody>${finalRows.map(r=>`<tr class="${r.id===selectedId?"selected":""} ${r.id===bestId?"best":""}"><td>${r.label || modelName(r)}<br><span class="tiny">${modelName(r)}</span></td><td>${r.aicc.toFixed(2)}</td><td>${r.bic.toFixed(2)}</td><td>${r.source||""}</td></tr>`).join("")}</tbody></table><p class="tiny">${mixed?'<span class="tag warn">compare carefully</span> Different transforms or differencing choices are not always directly comparable. ':''}Replace proxy metrics with real <code>glance()</code> AICc/BIC when exact R/fable JSON is available.</p>`;
 }
 
 function explain(ds,params,result,residAcf){
-  const items=[[`p=${params.p}`,params.p===0?"ignores past values":`uses last ${params.p} value${params.p>1?"s":""}`],[`d=${params.d}`,params.d===0?"original data":params.d===1?"models changes":"change of changes"],[`q=${params.q}`,params.q===0?"ignores past errors":`uses last ${params.q} error${params.q>1?"s":""}`],[`c ${params.c?"on":"off"}`,params.c?"mean / drift push":"no steady push"]];
-  let shape=""; if(params.d===0&&!params.c) shape="Forecast often settles into a flat level."; if(params.d===0&&params.c) shape="Forecast tends to settle around an average level."; if(params.d===1&&!params.c) shape="Random-walk style: forecast stays near the last value."; if(params.d===1&&params.c) shape="Drift style: forecast can move in a straight line."; if(params.d===2&&!params.c) shape="Second differencing: uncertainty grows faster."; if(params.d===2&&params.c) shape="Can create a curved path and much wider intervals.";
-  const restricted = (params.c?1:0)+params.d > 2 ? `<p><span class="tag bad">fable warning</span> This combination is usually outside fable's default <code>constant + d + D <= 2</code> search rule.</p>` : "";
+  const seasonalItem = isSeasonalFocus() ? [`P/Q=${params.P}/${params.Q}`,params.period>1&&params.P+params.Q?"seasonal memory":"no seasonal memory"] : ["seasonal",params.D?"seasonal pattern removed":"not used"];
+  const items=[[`log ${usesLog(params)?"on":"off"}`,usesLog(params)?"variance is compressed":"raw scale"],[`d=${params.d}`,params.d?"trend is differenced":"original shape"],[`p/q=${params.p}/${params.q}`,params.p+params.q?"short-run memory":"little short-run memory"],seasonalItem];
+  let shape=""; if(params.d+params.D===0&&!params.c) shape="Forecast often settles into a flat level."; if(params.d+params.D===0&&params.c) shape="Forecast tends to settle around an average level."; if(params.d+params.D===1&&!params.c) shape="Forecast stays close to the last repeating pattern."; if(params.d+params.D===1&&params.c) shape="Drift can push the forecast path."; if(params.d+params.D>1) shape="Extra differencing makes intervals widen faster.";
+  const restricted = (params.c?1:0)+params.d+params.D > 2 ? `<p><span class="tag bad">fable warning</span> This is usually outside fable's default <code>constant + d + D <= 2</code> search rule.</p>` : "";
   const residMsg = Math.max(...residAcf.map(Math.abs)) < .28 ? "Residual ACF looks fairly random." : "Residual ACF shows possible leftover pattern.";
-  el("explain").innerHTML = `<ul class="compact-list">${items.map(([t,txt])=>`<li><span class="tag">${t}</span><div>${txt}</div></li>`).join("")}</ul><p><strong>Main thing to notice:</strong> ${shape}</p>${restricted}<p><span class="tag ${params.d===2?"bad":params.d===1?"warn":"good"}">${params.d===2?"Careful with d=2":params.d===1?"Intervals widen with d=1":"Level-style behaviour"}</span> <span class="tag ${residMsg.includes("fairly")?"good":"warn"}">${residMsg}</span></p>`;
+  el("explain").innerHTML = `<ul class="compact-list">${items.map(([t,txt])=>`<li><span class="tag">${t}</span><div>${txt}</div></li>`).join("")}</ul><p><strong>Watch this:</strong> ${shape}</p>${restricted}<p><span class="tag ${params.d+params.D>1?"warn":"good"}">${params.d+params.D>1?"wide intervals":"controlled differencing"}</span> <span class="tag ${residMsg.includes("fairly")?"good":"warn"}">${residMsg}</span></p>`;
 }
 
 function update(){
   const ds=currentDataset(); updateCandidates();
   const params=currentParams(); const horizon=Math.min(+el("horizon").value, ds.future_labels.length);
-  el("pLabel").textContent=el("p").value; el("dLabel").textContent=el("d").value; el("qLabel").textContent=el("q").value; el("hLabel").textContent=horizon;
-  const result=forecastApprox(ds.values,params.p,params.d,params.q,params.c,horizon);
-  const work=diff(ds.values,params.d), workLabels=ds.labels.slice(ds.labels.length-work.length), acfVals=acf(work,17), pacfVals=pacfSimple(work,17), resid=result.residuals.length?result.residuals:[0], residLabels=workLabels.slice(workLabels.length-resid.length), residAcf=acf(resid,17);
-  el("modelPill").innerHTML=`<strong>${modelName(params.p,params.d,params.q,params.c)}</strong><br>${mode==="candidate"?params.label:"Manual model"}<br>p = past values<br>d = trend removal<br>q = past errors<br>c = ${params.c?"on":"off"}`;
-  el("forecastTitle").textContent=`${ds.name} forecast`; el("forecastMeta").textContent=`${ds.frequency} · ${modelName(params.p,params.d,params.q,params.c)} · ${horizon} steps`; el("forecastTakeaway").textContent=params.d===1&&!params.c?"Random-walk style":params.d===1&&params.c?"Drift-style forecast":params.d===2?"Higher uncertainty":"Level-style forecast";
-  el("seriesTitle").textContent=params.d===0?"Original series + ACF/PACF":"Differenced series + ACF/PACF"; el("seriesMeta").textContent=params.d===0?"d=0: original data":`d=${params.d}: differenced data`; el("seriesTakeaway").textContent=params.d===0?"Stationarity check":"ACF/PACF after differencing";
-  drawForecast(ds,result,horizon); drawSeries("seriesSvg",work,workLabels,params.d===0?ds.value_label:`difference d=${params.d}`,240); drawBars("acfSvg",acfVals,"acf",200); drawBars("pacfSvg",pacfVals,"pacf",200);
-  drawSeries("residSvg",resid,residLabels,"residuals",330); drawBars("residAcfSvg",residAcf,"acf",210); drawHistogram("histSvg",resid);
-  const maxResidAcf=Math.max(...residAcf.map(Math.abs)); el("residTakeaway").textContent=maxResidAcf<.28?"Looks fairly random":"Some leftover pattern"; el("ljungBoxBox").innerHTML=`<strong>Approx residual check:</strong> ${maxResidAcf<.28?"No obvious leftover autocorrelation in this teaching check.":"Some residual autocorrelation remains; model may be missing structure."}<br><span class="tiny">In the real Week 8 workflow this should be replaced by <code>features(.innov, ljung_box, lag=..., dof=...)</code>.</span>`;
+  const hasSeason=isSeasonal(ds);
+  el("advancedSeasonal").hidden=!isSeasonalFocus();
+  el("seasonalModel").hidden=!isSeasonalFocus();
+  el("seasonalDiffLabel").classList.toggle("disabled",!hasSeason);
+  el("seasonalModel").classList.toggle("disabled",!hasSeason);
+  el("seasonalDifference").disabled=!hasSeason; el("period").disabled=!hasSeason || !isSeasonalFocus(); el("P").disabled=!hasSeason || !isSeasonalFocus(); el("Q").disabled=!hasSeason || !isSeasonalFocus();
+  el("pLabel").textContent=el("p").value; el("dLabel").textContent=el("d").value; el("qLabel").textContent=el("q").value; el("PLabel").textContent=el("P").value; el("QLabel").textContent=el("Q").value; el("hLabel").textContent=horizon;
+  const result=forecastApprox(ds,params,horizon);
+  const work=result.work, workLabels=result.labels, acfVals=acf(work,17), pacfVals=pacfSimple(work,17), resid=result.residuals.length?result.residuals:[0], residLabels=workLabels.slice(workLabels.length-resid.length), residAcf=acf(resid,17);
+  const prepTags=[
+    usesLog(params)?'<span class="tag good">log on</span>':'<span class="tag">raw scale</span>',
+    params.D?'<span class="tag good">seasonal diff</span>':'<span class="tag">no seasonal diff</span>',
+    params.d?'<span class="tag good">trend differenced</span>':'<span class="tag">level view</span>'
+  ];
+  el("prepHints").innerHTML=prepTags.join("");
+  el("modelPill").innerHTML=`<strong>${modelName(params)}</strong><br>${mode==="candidate"?params.label:"Manual model"}<br><span class="tiny">${ds.lesson_focus || "ARIMA workflow"}</span>`;
+  el("forecastTitle").textContent=`${ds.name} forecast`; el("forecastMeta").textContent=`${ds.frequency} · ${modelName(params)} · ${horizon} steps`; el("forecastTakeaway").textContent=params.D?"Seasonal pattern carried forward":params.d===1&&!params.c?"Random-walk style":params.d===1&&params.c?"Drift-style forecast":params.d+params.D>1?"Higher uncertainty":"Level-style forecast";
+  const prepBits=[usesLog(params)?"log":null,params.D?(isSeasonalFocus()?`seasonal diff at ${params.period}`:"seasonal diff"):null,params.d?`d=${params.d}`:null].filter(Boolean);
+  el("seriesTitle").textContent=prepBits.length?"Prepared series + ACF/PACF":"Original series + ACF/PACF"; el("seriesMeta").textContent=prepBits.length?prepBits.join(" · "):"no transform or differencing"; el("seriesTakeaway").textContent=params.D?"Check seasonal spikes":params.d?"ACF/PACF after differencing":"Stationarity check";
+  drawForecast(ds,result,horizon); drawSeries("seriesSvg",work,workLabels,prepBits.length?prepBits.join(" + "):ds.value_label,165); drawBars("acfSvg",acfVals,"acf",135); drawBars("pacfSvg",pacfVals,"pacf",135);
+  drawSeries("residSvg",resid,residLabels,"residuals",220); drawBars("residAcfSvg",residAcf,"acf",145); drawHistogram("histSvg",resid);
+  const maxResidAcf=Math.max(...residAcf.map(Math.abs)); el("residTakeaway").textContent=maxResidAcf<.28?"Looks fairly random":"Some leftover pattern"; el("ljungBoxBox").innerHTML=`<strong>Approx residual check:</strong> ${maxResidAcf<.28?"No obvious leftover autocorrelation in this teaching check.":"Some residual autocorrelation remains; model may be missing structure."}<br><span class="tiny">In R, replace this with <code>features(.innov, ljung_box, lag=..., dof=...)</code>.</span>`;
   renderComparison(ds,params); explain(ds,params,result,residAcf);
 }
 
 async function init(){
   await tryLoadJSON();
-  const select=el("dataset"); select.innerHTML="";
-  datasets().forEach(ds=>{const opt=document.createElement("option"); opt.value=ds.id; opt.textContent=`${ds.name} (${ds.frequency})`; select.appendChild(opt);});
+  refreshDatasets();
   updateCandidates();
+  applyCandidateToControls();
   controls.forEach(id=>{el(id).addEventListener("input",update); el(id).addEventListener("change",update);});
-  el("dataset").addEventListener("change",()=>{updateCandidates(); update();});
+  el("studyFocus").addEventListener("change",()=>{refreshDatasets(); updateCandidates(); applyCandidateToControls(); update();});
+  el("dataset").addEventListener("change",()=>{updateCandidates(); applyCandidateToControls(); update();});
+  el("candidate").addEventListener("change",()=>{applyCandidateToControls(); update();});
   el("candidateMode").addEventListener("click",()=>setMode("candidate")); el("manualMode").addEventListener("click",()=>setMode("manual"));
   el("exploreTab").addEventListener("click",()=>setView("explore")); el("checkTab").addEventListener("click",()=>setView("check"));
   update();
