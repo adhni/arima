@@ -3,7 +3,7 @@ library(fpp3)
 # 1. EGYPTIAN EXPORTS -----------------------------
 # Explore the Egyptian exports series. Is data stationary? What ARIMA model should be used?
 
-egypt <-global_economy |>
+egypt <- global_economy |>
   filter(Code == "EGY")
 
 egypt |> autoplot(Exports) +

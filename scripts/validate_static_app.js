@@ -20,6 +20,19 @@ function readJson(filePath) {
   }
 }
 
+function readInlineSample(indexHtml) {
+  const match = indexHtml.match(/const SAMPLE = (\{.*\});\nlet APP_DATA = SAMPLE;/s);
+  if (!match) {
+    fail("index.html must contain an inline SAMPLE fallback");
+  }
+
+  try {
+    return JSON.parse(match[1]);
+  } catch (error) {
+    fail(`inline SAMPLE fallback is not valid JSON: ${error.message}`);
+  }
+}
+
 function requireArray(value, label) {
   if (!Array.isArray(value) || value.length === 0) {
     fail(`${label} must be a non-empty array`);
@@ -98,4 +111,13 @@ requireString(data.schema_version, "schema_version");
 requireArray(data.datasets, "datasets");
 data.datasets.forEach(validateDataset);
 
-console.log(`Static app validation passed for ${data.datasets.length} datasets.`);
+const sample = readInlineSample(indexHtml);
+requireString(sample.schema_version, "inline SAMPLE schema_version");
+requireArray(sample.datasets, "inline SAMPLE datasets");
+sample.datasets.forEach(validateDataset);
+
+if (JSON.stringify(sample) !== JSON.stringify(data)) {
+  fail("inline SAMPLE fallback does not match data/arima_examples.json");
+}
+
+console.log(`Static app validation passed for ${data.datasets.length} datasets and inline fallback.`);
