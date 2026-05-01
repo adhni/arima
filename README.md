@@ -2,24 +2,6 @@
 
 This version keeps the app as a live lever playground while covering the core Week 7-9 ARIMA workflow.
 
-## Use it
-
-Open the app through a local web server so the browser can load `data/arima_examples.json`:
-
-```sh
-python3 -m http.server 8000
-```
-
-Then visit `http://localhost:8000/`.
-
-Before publishing, run the static checks:
-
-```sh
-node scripts/validate_static_app.js
-```
-
-## New in v6
-
 - Candidate model mode
 - Manual model mode
 - Log transform, first-difference, and seasonal-difference controls
