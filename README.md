@@ -2,6 +2,8 @@
 
 This version keeps the app as a live lever playground while covering the core Week 7-9 ARIMA workflow.
 
+Live app: https://adhni.github.io/arima/
+
 - Candidate model mode
 - Manual model mode
 - Log transform, first-difference, and seasonal-difference controls
