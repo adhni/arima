@@ -74,6 +74,28 @@ function validateCandidate(candidate, datasetId, index) {
   }
 }
 
+function validateETSCandidate(candidate, datasetId, index) {
+  const prefix = `${datasetId}.ets_candidates[${index}]`;
+  requireString(candidate.id, `${prefix}.id`);
+  requireString(candidate.label, `${prefix}.label`);
+
+  if (!["none", "log"].includes(candidate.transform)) {
+    fail(`${prefix}.transform must be "none" or "log"`);
+  }
+
+  if (!["A", "M"].includes(candidate.error)) {
+    fail(`${prefix}.error must be "A" or "M"`);
+  }
+
+  if (!["N", "A", "Ad"].includes(candidate.trend)) {
+    fail(`${prefix}.trend must be "N", "A", or "Ad"`);
+  }
+
+  if (!["N", "A", "M"].includes(candidate.season)) {
+    fail(`${prefix}.season must be "N", "A", or "M"`);
+  }
+}
+
 function validateDataset(dataset, index) {
   const prefix = `datasets[${index}]`;
   requireString(dataset.id, `${prefix}.id`);
@@ -83,7 +105,12 @@ function validateDataset(dataset, index) {
   requireArray(dataset.labels, `${prefix}.labels`);
   requireNumberArray(dataset.values, `${prefix}.values`);
   requireArray(dataset.future_labels, `${prefix}.future_labels`);
-  requireArray(dataset.candidates, `${prefix}.candidates`);
+  const isETS = dataset.model_family === "ets";
+  if (isETS) {
+    requireArray(dataset.ets_candidates, `${prefix}.ets_candidates`);
+  } else {
+    requireArray(dataset.candidates, `${prefix}.candidates`);
+  }
 
   if (dataset.labels.length !== dataset.values.length) {
     fail(`${prefix}.labels and ${prefix}.values must have the same length`);
@@ -93,9 +120,15 @@ function validateDataset(dataset, index) {
     fail(`${prefix}.seasonal_period must be a non-negative number`);
   }
 
-  dataset.candidates.forEach((candidate, candidateIndex) => {
-    validateCandidate(candidate, dataset.id, candidateIndex);
-  });
+  if (isETS) {
+    dataset.ets_candidates.forEach((candidate, candidateIndex) => {
+      validateETSCandidate(candidate, dataset.id, candidateIndex);
+    });
+  } else {
+    dataset.candidates.forEach((candidate, candidateIndex) => {
+      validateCandidate(candidate, dataset.id, candidateIndex);
+    });
+  }
 }
 
 if (!fs.existsSync(indexPath)) fail("index.html is missing");
