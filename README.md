@@ -1,13 +1,17 @@
-# ARIMA Workflow Visualiser v6
+# Forecast Workflow Visualiser v7
 
-This version keeps the app as a live lever playground while covering the core Week 7-9 ARIMA workflow.
+This version keeps the app as a live lever playground while covering the core Week 7-9 ARIMA workflow and the Week 5/6 ETS workflow.
 
 Live app: https://adhni.github.io/arima/
 
+- Top-level ARIMA and ETS tabs
 - Candidate model mode
 - Manual model mode
 - Log transform, first-difference, and seasonal-difference controls
 - Study-focus selector for choosing p/q, differencing, or seasonal patterns
+- ETS error/trend/season controls
+- ETS components view for level, trend, and season
+- Week 5/6-style ETS examples for holiday tourism, Algeria exports, Australian population, and H02 medicine costs
 - Week 7-style stationarity example
 - Seasonal ARIMA example
 - AICc/BIC-style comparison table
@@ -18,6 +22,8 @@ Live app: https://adhni.github.io/arima/
 ## Data status
 
 The included data and metrics are teaching proxies, suitable for demonstrating the workflow and publishing the static app. The UI is ready for real R/fable output when exact class-generated outputs are available.
+
+The ETS tab is intentionally student-facing: students choose additive or multiplicative error, no/linear/damped trend, and no/additive/multiplicative season. The app then shows the matching ETS code-style label such as `ETS(M,Ad,M)`.
 
 Future exact-data workflow:
 
