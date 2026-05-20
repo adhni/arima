@@ -3366,6 +3366,19 @@ function regressionSpec(overrides={}){
     ...overrides
   };
 }
+function comparisonSpec(overrides={}){
+  return {
+    trend:false,
+    piecewise:false,
+    knot:24,
+    seasonal:false,
+    fourier:false,
+    promo:false,
+    forecastType:"exante",
+    k:2,
+    ...overrides
+  };
+}
 function regressionColumns(ds,spec,t,totalN){
   const cols=[{name:"intercept",value:1}];
   if(spec.trend) cols.push({name:"trend",value:t+1});
@@ -3426,7 +3439,7 @@ function renderRegressionComparison(ds,currentSpec){
     ["Trend + promotion",{trend:true,seasonal:false,fourier:false,promo:true}],
     ["Piecewise trend + seasonal",{trend:true,piecewise:true,knot:24,seasonal:true,fourier:false}],
     ["Current controls",currentSpec]
-  ].map(([label,spec])=>({label,spec:regressionSpec(spec)}));
+  ].map(([label,spec])=>({label,spec:label==="Current controls" ? currentSpec : comparisonSpec(spec)}));
   const rows=candidates.map(c=>({label:c.label,result:fitRegression(ds,c.spec,Math.min(12,ds.future_labels.length)),spec:c.spec})).sort((a,b)=>a.result.aicc-b.result.aicc);
   el("regComparisonTable").innerHTML=`<p class="tiny"><span class="tag warn">teaching proxy</span> Metrics are browser approximations for learning.</p><table><thead><tr><th>Model</th><th>Predictors</th><th>Adj R²</th><th>AICc-style</th><th>BIC-style</th><th>CV-style</th></tr></thead><tbody>${rows.map((r,i)=>`<tr class="${r.label==="Current controls"?"selected":""} ${i===0?"best":""}"><td>${r.label}</td><td>${r.result.names.length}</td><td>${r.result.adjR2.toFixed(2)}</td><td>${r.result.aicc.toFixed(1)}</td><td>${r.result.bic.toFixed(1)}</td><td>${r.result.cv.toFixed(1)}</td></tr>`).join("")}</tbody></table>`;
 }
