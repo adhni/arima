@@ -60,6 +60,17 @@ summary{cursor:pointer;font-weight:800;font-size:.84rem;margin:10px 0 5px;color:
 .tab{border-radius:999px;padding:8px 12px}
 .tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
 .view{display:none} .view.active{display:block}
+.top-tabs{display:flex;gap:8px;margin:0 0 12px}
+.app-view[hidden]{display:none!important}
+.reg-two-col{display:grid;grid-template-columns:minmax(260px,.85fr) minmax(360px,1.15fr);gap:10px;align-items:start}
+.metric-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0}
+.metric{border:1px solid var(--border);border-radius:12px;background:#fafafa;padding:8px;min-height:58px}
+.metric span{display:block;color:var(--muted);font-size:.75rem;font-weight:800;margin-bottom:3px}
+.metric strong{display:block;font-size:1rem;line-height:1.15}
+.subtle-box{margin-top:8px;padding:8px 10px;border:1px solid #ececec;border-radius:12px;background:#fbfbfb}
+.coef-table{width:100%;border-collapse:collapse;font-size:.86rem}
+.coef-table th,.coef-table td{border-bottom:1px solid #ececec;padding:6px;text-align:left}
+.coef-table th{color:var(--muted);font-weight:800}
 .chart-head{display:flex;justify-content:space-between;gap:12px;align-items:start;margin-bottom:6px}
 .chart-head strong{font-size:1.05rem}
 .meta{font-size:.86rem;color:var(--muted)}
@@ -70,6 +81,7 @@ svg{display:block;width:100%;height:auto}
 .legend{display:flex;flex-wrap:wrap;gap:10px;color:var(--muted);font-size:.82rem;margin:5px 0 0}
 .legend span::before{content:"";display:inline-block;width:14px;height:4px;border-radius:999px;background:var(--hist);margin-right:6px;vertical-align:middle}
 .legend .fc::before{background:var(--forecast)} .legend .r80::before{background:var(--r80);height:10px} .legend .r95::before{background:var(--r95);height:10px}
+.legend .fit::before{background:repeating-linear-gradient(90deg,var(--forecast) 0 5px,transparent 5px 8px)}
 .compare{margin-top:10px;padding:0;overflow:hidden}
 .compare summary{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0;padding:10px;color:var(--ink);font-size:inherit;list-style:none}
 .compare summary::-webkit-details-marker{display:none}
@@ -91,8 +103,8 @@ svg{display:block;width:100%;height:auto}
 .lb{padding:10px;margin:10px 0 0;background:#fafafa;border:1px solid var(--border);border-radius:14px;font-size:.9rem}
 footer{text-align:center;color:var(--muted);font-size:.84rem;margin-top:16px}
 @media(max-width:1120px){.layout{grid-template-columns:1fr}.controls{position:static}}
-@media(max-width:780px){header{display:block}.chart-grid{grid-template-columns:1fr}.compact-list{grid-template-columns:1fr 1fr}.mode-grid{grid-template-columns:1fr}.mini-grid{grid-template-columns:1fr}}
-@media(max-width:520px){.compact-list{grid-template-columns:1fr}}
+@media(max-width:780px){header{display:block}.chart-grid,.reg-two-col{grid-template-columns:1fr}.metric-strip{grid-template-columns:1fr 1fr}.compact-list{grid-template-columns:1fr 1fr}.mode-grid{grid-template-columns:1fr}.mini-grid{grid-template-columns:1fr}}
+@media(max-width:520px){.compact-list,.metric-strip{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -104,7 +116,12 @@ footer{text-align:center;color:var(--muted);font-size:.84rem;margin-top:16px}
   </div>
 </header>
 
-<div class="layout">
+<div class="top-tabs" aria-label="App section">
+  <button class="tab active" id="arimaAppTab" type="button">ARIMA / ETS</button>
+  <button class="tab" id="regressionAppTab" type="button">Regression</button>
+</div>
+
+<div class="layout app-view" id="arimaApp">
   <aside class="panel controls">
     <h2>Controls</h2>
     <label>Model family</label>
@@ -276,6 +293,95 @@ footer{text-align:center;color:var(--muted);font-size:.84rem;margin-top:16px}
       <summary><h2>Model comparison</h2></summary>
       <div class="compare-body" id="comparisonTable"></div>
     </details>
+  </main>
+</div>
+
+<div class="layout app-view" id="regressionApp" hidden>
+  <aside class="panel controls">
+    <h2>Regression</h2>
+    <label for="regDataset">Dataset</label>
+    <select id="regDataset">
+      <option value="retail">Monthly retail proxy</option>
+    </select>
+
+    <div class="control-block">
+      <div class="step-title"><span>1</span>Choose predictors</div>
+      <label class="toggle"><input id="regTrend" type="checkbox" checked> trend</label>
+      <label class="toggle"><input id="regPiecewise" type="checkbox"> piecewise trend</label>
+      <div id="regKnotBox" hidden>
+        <label><div class="value-row">Knot position <span class="badge" id="regKnotLabel">24</span></div></label>
+        <input id="regKnot" type="range" min="6" max="30" value="24">
+      </div>
+      <label class="toggle"><input id="regSeasonal" type="checkbox" checked> seasonal dummies</label>
+      <label class="toggle"><input id="regFourier" type="checkbox"> Fourier terms</label>
+      <div id="regFourierBox" hidden>
+        <label><div class="value-row">Fourier K <span class="badge" id="regKLabel">2</span></div></label>
+        <input id="regK" type="range" min="1" max="4" value="2">
+      </div>
+      <label class="toggle"><input id="regPromo" type="checkbox"> promotion dummy</label>
+      <div id="regForecastTypeBox" hidden>
+        <label for="regForecastType">Future predictors</label>
+        <select id="regForecastType">
+          <option value="exante">Ex-ante: forecast future promotions</option>
+          <option value="expost">Ex-post: use known future promotions</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="control-block">
+      <div class="step-title"><span>2</span>Forecast</div>
+      <label><div class="value-row">Forecast horizon <span class="badge" id="regHLabel">12</span></div></label>
+      <input id="regHorizon" type="range" min="4" max="24" value="12">
+    </div>
+
+    <div class="pill" id="regModelPill"></div>
+    <p class="tiny">Teaching proxy: this uses browser OLS so students can see the regression workflow.</p>
+  </aside>
+
+  <main class="panel main">
+    <div class="chart-head">
+      <div>
+        <strong id="regTitle">Regression forecast</strong>
+        <div class="meta" id="regMeta"></div>
+      </div>
+      <div class="meta" id="regTakeaway"></div>
+    </div>
+    <div class="gg-card"><svg id="regForecastSvg" viewBox="0 0 920 255" aria-label="Regression forecast chart"></svg></div>
+    <div class="legend"><span>actual</span><span class="fit">fitted</span><span class="fc">forecast</span></div>
+    <div class="metric-strip" id="regMetricStrip"></div>
+
+    <div class="reg-two-col">
+      <section class="panel explain">
+        <h2>Coefficients</h2>
+        <div id="regCoefTable"></div>
+      </section>
+
+      <details class="panel compare" open>
+        <summary><h2>Model comparison</h2></summary>
+        <div class="compare-body" id="regComparisonTable"></div>
+      </details>
+    </div>
+
+    <section class="panel explain">
+      <div class="chart-head">
+        <div>
+          <h2>Diagnostics</h2>
+          <div class="meta">Residual = actual − fitted. Good residuals should look random.</div>
+        </div>
+        <div class="meta" id="regResidTakeaway"></div>
+      </div>
+      <div class="gg-card"><svg id="regResidSvg" viewBox="0 0 920 180" aria-label="Regression residual chart"></svg></div>
+      <div class="chart-grid">
+        <div class="gg-card"><h3>Residual ACF</h3><svg id="regResidAcfSvg" viewBox="0 0 440 145" aria-label="Regression residual ACF chart"></svg></div>
+        <div class="gg-card"><h3>Residual histogram</h3><svg id="regHistSvg" viewBox="0 0 440 145" aria-label="Regression residual histogram"></svg></div>
+      </div>
+      <div class="lb" id="regResidSummary"></div>
+    </section>
+
+    <section class="panel explain">
+      <h2>What this regression is doing</h2>
+      <div id="regExplain"></div>
+    </section>
   </main>
 </div>
 
@@ -2941,9 +3047,25 @@ let APP_DATA = SAMPLE;
 let modelFamily = "arima";
 let mode = "manual";
 let activeView = "explore";
+let appSection = "arima";
 
 const el = id => document.getElementById(id);
 const controls = ["studyFocus","dataset","candidate","logTransform","d","seasonalDifference","period","p","q","P","Q","constant","horizon","etsCandidate","etsTransform","etsError","etsTrend","etsSeason"];
+const regControls = ["regTrend","regPiecewise","regKnot","regSeasonal","regFourier","regK","regPromo","regForecastType","regHorizon"];
+const REG_DATASETS = {
+  retail: {
+    name:"Monthly retail proxy",
+    frequency:"monthly",
+    period:12,
+    value_label:"sales",
+    labels:["2021 Jan","2021 Feb","2021 Mar","2021 Apr","2021 May","2021 Jun","2021 Jul","2021 Aug","2021 Sep","2021 Oct","2021 Nov","2021 Dec","2022 Jan","2022 Feb","2022 Mar","2022 Apr","2022 May","2022 Jun","2022 Jul","2022 Aug","2022 Sep","2022 Oct","2022 Nov","2022 Dec","2023 Jan","2023 Feb","2023 Mar","2023 Apr","2023 May","2023 Jun","2023 Jul","2023 Aug","2023 Sep","2023 Oct","2023 Nov","2023 Dec"],
+    values:[82,78,86,91,94,101,108,106,99,104,118,138,88,84,93,98,102,108,116,113,106,112,126,149,95,91,100,106,111,117,125,122,115,121,137,160],
+    promo:[0,0,0,1,0,0,1,0,0,1,1,1,0,0,0,1,0,0,1,0,0,1,1,1,0,0,0,1,0,0,1,0,0,1,1,1],
+    future_promo_exante:[0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,1],
+    future_promo_expost:[0,1,0,1,0,0,1,0,1,0,1,1,0,1,0,1,0,0,1,0,1,0,1,1],
+    future_labels:["2024 Jan","2024 Feb","2024 Mar","2024 Apr","2024 May","2024 Jun","2024 Jul","2024 Aug","2024 Sep","2024 Oct","2024 Nov","2024 Dec","2025 Jan","2025 Feb","2025 Mar","2025 Apr","2025 May","2025 Jun","2025 Jul","2025 Aug","2025 Sep","2025 Oct","2025 Nov","2025 Dec"]
+  }
+};
 
 async function tryLoadJSON(){
   try {
@@ -3230,6 +3352,134 @@ function modelScore(ds, params){
   return {aicc,bic,sigma:result.sigma};
 }
 
+function regressionDataset(){ return REG_DATASETS[el("regDataset")?.value || "retail"] || REG_DATASETS.retail; }
+function regressionSpec(overrides={}){
+  return {
+    trend:el("regTrend")?.checked ?? true,
+    piecewise:el("regPiecewise")?.checked ?? false,
+    knot:+(el("regKnot")?.value || 24),
+    seasonal:el("regSeasonal")?.checked ?? true,
+    fourier:el("regFourier")?.checked ?? false,
+    promo:el("regPromo")?.checked ?? false,
+    forecastType:el("regForecastType")?.value || "exante",
+    k:+(el("regK")?.value || 2),
+    ...overrides
+  };
+}
+function comparisonSpec(overrides={}){
+  return {
+    trend:false,
+    piecewise:false,
+    knot:24,
+    seasonal:false,
+    fourier:false,
+    promo:false,
+    forecastType:"exante",
+    k:2,
+    ...overrides
+  };
+}
+function regressionColumns(ds,spec,t,totalN){
+  const cols=[{name:"intercept",value:1}];
+  if(spec.trend) cols.push({name:"trend",value:t+1});
+  if(spec.piecewise) cols.push({name:"after knot",value:Math.max(0,t+1-spec.knot)});
+  if(spec.seasonal){
+    const season=t%ds.period;
+    for(let s=1;s<ds.period;s++) cols.push({name:`season ${s+1}`,value:season===s?1:0});
+  }
+  if(spec.fourier){
+    for(let k=1;k<=spec.k;k++){
+      const angle=2*Math.PI*k*t/ds.period;
+      cols.push({name:`sin K=${k}`,value:Math.sin(angle)},{name:`cos K=${k}`,value:Math.cos(angle)});
+    }
+  }
+  if(spec.promo){
+    const futureIndex=t-ds.values.length, promo=t<ds.values.length ? ds.promo[t] : ds[spec.forecastType === "expost" ? "future_promo_expost" : "future_promo_exante"][futureIndex];
+    cols.push({name:"promotion",value:promo || 0});
+  }
+  return cols;
+}
+function fitRegression(ds,spec,horizon){
+  const n=ds.values.length, first=regressionColumns(ds,spec,0,n), names=first.map(c=>c.name), k=names.length;
+  const rows=ds.values.map((_,i)=>regressionColumns(ds,spec,i,n).map(c=>c.value));
+  const XtX=Array.from({length:k},()=>Array(k).fill(0)), Xty=Array(k).fill(0);
+  rows.forEach((row,r)=>{ for(let i=0;i<k;i++){ Xty[i]+=row[i]*ds.values[r]; for(let j=0;j<k;j++) XtX[i][j]+=row[i]*row[j]; } });
+  for(let i=0;i<k;i++) XtX[i][i]+=0.0001;
+  let beta; try{beta=solve(XtX,Xty)}catch(e){beta=Array(k).fill(0)}
+  const fitted=rows.map(row=>row.reduce((a,v,i)=>a+v*(beta[i]||0),0));
+  const residuals=ds.values.map((v,i)=>v-fitted[i]);
+  const forecast=[];
+  for(let h=0;h<horizon;h++){
+    const row=regressionColumns(ds,spec,n+h,n+horizon).map(c=>c.value);
+    forecast.push(row.reduce((a,v,i)=>a+v*(beta[i]||0),0));
+  }
+  const rss=residuals.reduce((a,v)=>a+v*v,0)||1, tss=ds.values.reduce((a,v)=>a+(v-mean(ds.values))**2,0)||1;
+  const r2=1-rss/tss, adjR2=1-(1-r2)*(n-1)/Math.max(1,n-k);
+  const aic=n*Math.log(rss/n)+2*k, aicc=aic+(2*k*(k+1))/Math.max(1,n-k-1), bic=n*Math.log(rss/n)+Math.log(n)*k;
+  const cv=Math.sqrt(rss/n)*(1+k/Math.max(1,n-k));
+  return {names,beta,fitted,forecast,residuals,adjR2,aicc,bic,cv};
+}
+function drawRegressionForecast(ds,result,horizon){
+  const svg=el("regForecastSvg"), W=920,H=255,m={left:58,right:18,top:12,bottom:34}, iw=W-m.left-m.right, ih=H-m.top-m.bottom;
+  const hist=ds.values, all=hist.concat(result.fitted,result.forecast).filter(Number.isFinite); let lo=Math.min(...all), hi=Math.max(...all), pad=(hi-lo)*.12||1; lo-=pad; hi+=pad;
+  const total=hist.length+horizon, x=i=>m.left+i/Math.max(1,total-1)*iw, y=v=>m.top+(hi-v)/(hi-lo)*ih;
+  const yTicks=ticks(lo,hi,5).map(v=>({v,y:y(v)})), xTicks=[]; for(let j=0;j<6;j++){const i=Math.round(j*(total-1)/5); xTicks.push({i,x:x(i),label:i<hist.length?ds.labels[i]:ds.future_labels[i-hist.length]})}
+  ggBase(svg,W,H,m,yTicks,xTicks); yTicks.forEach(t=>make("text",{x:m.left-9,y:t.y+4,"text-anchor":"end",fill:"#555","font-size":12},svg).textContent=(Math.round(t.v*10)/10).toString()); xTicks.forEach(t=>make("text",{x:t.x,y:H-14,"text-anchor":"middle",fill:"#555","font-size":11},svg).textContent=t.label);
+  const splitX=x(hist.length-1); make("line",{x1:splitX,y1:m.top,x2:splitX,y2:H-m.bottom,stroke:"#777","stroke-dasharray":"5 6"},svg);
+  make("path",{d:linePath(hist.map((v,i)=>[x(i),y(v)])),fill:"none",stroke:"#111","stroke-width":2.7},svg);
+  make("path",{d:linePath(result.fitted.map((v,i)=>[x(i),y(v)])),fill:"none",stroke:"var(--forecast)","stroke-width":2.4,"stroke-dasharray":"7 5",opacity:.9},svg);
+  make("path",{d:linePath([[x(hist.length-1),y(result.fitted.at(-1))]].concat(result.forecast.map((v,i)=>[x(hist.length+i),y(v)]))),fill:"none",stroke:"var(--forecast)","stroke-width":3.2},svg);
+}
+function renderRegressionComparison(ds,currentSpec){
+  const candidates=[
+    ["Mean only",{trend:false,seasonal:false,fourier:false}],
+    ["Trend",{trend:true,seasonal:false,fourier:false}],
+    ["Trend + seasonal dummies",{trend:true,seasonal:true,fourier:false}],
+    ["Trend + Fourier K=2",{trend:true,seasonal:false,fourier:true,k:2,promo:false}],
+    ["Trend + promotion",{trend:true,seasonal:false,fourier:false,promo:true}],
+    ["Piecewise trend + seasonal",{trend:true,piecewise:true,knot:24,seasonal:true,fourier:false}],
+    ["Current controls",currentSpec]
+  ].map(([label,spec])=>({label,spec:label==="Current controls" ? currentSpec : comparisonSpec(spec)}));
+  const rows=candidates.map(c=>({label:c.label,result:fitRegression(ds,c.spec,Math.min(12,ds.future_labels.length)),spec:c.spec})).sort((a,b)=>a.result.aicc-b.result.aicc);
+  el("regComparisonTable").innerHTML=`<p class="tiny"><span class="tag warn">teaching proxy</span> Metrics are browser approximations for learning.</p><table><thead><tr><th>Model</th><th>Predictors</th><th>Adj R²</th><th>AICc-style</th><th>BIC-style</th><th>CV-style</th></tr></thead><tbody>${rows.map((r,i)=>`<tr class="${r.label==="Current controls"?"selected":""} ${i===0?"best":""}"><td>${r.label}</td><td>${r.result.names.length}</td><td>${r.result.adjR2.toFixed(2)}</td><td>${r.result.aicc.toFixed(1)}</td><td>${r.result.bic.toFixed(1)}</td><td>${r.result.cv.toFixed(1)}</td></tr>`).join("")}</tbody></table>`;
+}
+function updateRegression(){
+  const ds=regressionDataset(), spec=regressionSpec(), horizon=Math.min(+el("regHorizon").value, ds.future_labels.length);
+  el("regKnotBox").hidden=!spec.piecewise; el("regKnotLabel").textContent=spec.knot;
+  el("regForecastTypeBox").hidden=!spec.promo;
+  el("regFourierBox").hidden=!spec.fourier; el("regKLabel").textContent=spec.k; el("regHLabel").textContent=horizon;
+  const result=fitRegression(ds,spec,horizon);
+  drawRegressionForecast(ds,result,horizon);
+  const parts=[spec.trend?"trend":null,spec.piecewise?`knot at ${spec.knot}`:null,spec.seasonal?"seasonal dummies":null,spec.fourier?`Fourier K=${spec.k}`:null,spec.promo?"promotion dummy":null].filter(Boolean);
+  el("regModelPill").innerHTML=`<strong>${parts.join(" + ") || "mean only"}</strong><br>TSLM-style regression`;
+  el("regTitle").textContent=`${ds.name} regression forecast`; el("regMeta").textContent=`${ds.frequency} · ${horizon} steps`; el("regTakeaway").textContent=spec.fourier?"smooth seasonality":spec.seasonal?"calendar effects":"trend fit";
+  el("regCoefTable").innerHTML=`<table class="coef-table"><thead><tr><th>Term</th><th>Estimate</th></tr></thead><tbody>${result.names.map((name,i)=>`<tr><td>${name}</td><td>${result.beta[i].toFixed(3)}</td></tr>`).join("")}</tbody></table>`;
+  const residAcf=acf(result.residuals,Math.min(17,result.residuals.length-1));
+  const rmse=Math.sqrt(mean(result.residuals.map(v=>v*v)));
+  el("regMetricStrip").innerHTML=[
+    ["Adj R²",result.adjR2.toFixed(2)],
+    ["RMSE",rmse.toFixed(2)],
+    ["Terms",String(result.names.length)],
+    ["Future x",spec.promo ? (spec.forecastType==="expost" ? "ex-post" : "ex-ante") : "none"]
+  ].map(([label,value])=>`<div class="metric"><span>${label}</span><strong>${value}</strong></div>`).join("");
+  drawSeries("regResidSvg",result.residuals,ds.labels.slice(ds.labels.length-result.residuals.length),"residuals",180);
+  drawBars("regResidAcfSvg",residAcf,"acf",145);
+  drawHistogram("regHistSvg",result.residuals);
+  const maxResidAcf=Math.max(0,...residAcf.map(Math.abs));
+  el("regResidTakeaway").textContent=maxResidAcf<.28?"Looks fairly random":"Pattern remains";
+  el("regResidSummary").innerHTML=`<strong>Approx residual check:</strong> RMSE ${rmse.toFixed(2)}. ${maxResidAcf<.28?"No obvious leftover autocorrelation in this teaching check.":"Residual autocorrelation remains; add seasonality, Fourier terms, or consider ARIMA errors later."}`;
+  renderRegressionComparison(ds,spec);
+  el("regExplain").innerHTML=`<ul class="compact-list"><li><span class="tag">trend</span><div>${spec.trend?"allows steady growth or decline":"not included"}</div></li><li><span class="tag">knot</span><div>${spec.piecewise?`slope can change after ${spec.knot}`:"single slope"}</div></li><li><span class="tag">season</span><div>${spec.seasonal?"uses month dummies":"not included"}</div></li><li><span class="tag">future x</span><div>${spec.forecastType==="expost"?"ex-post uses known future promotions":"ex-ante forecasts future promotions"}</div></li></ul>`;
+}
+function setAppSection(next){
+  appSection=next;
+  el("arimaAppTab").classList.toggle("active",next==="arima");
+  el("regressionAppTab").classList.toggle("active",next==="regression");
+  el("arimaApp").hidden=next!=="arima";
+  el("regressionApp").hidden=next!=="regression";
+  if(next==="regression") updateRegression();
+}
+
 function visibleCandidates(ds){
   if(modelFamily === "ets") return ds.ets_candidates || [];
   const candidates=ds.candidates || [];
@@ -3481,6 +3731,11 @@ async function init(){
   el("arimaFamily").addEventListener("click",()=>setFamily("arima"));
   el("etsFamily").addEventListener("click",()=>setFamily("ets"));
   el("exploreTab").addEventListener("click",()=>setView("explore")); el("checkTab").addEventListener("click",()=>setView("check"));
+  el("arimaAppTab").addEventListener("click",()=>setAppSection("arima"));
+  el("regressionAppTab").addEventListener("click",()=>setAppSection("regression"));
+  regControls.forEach(id=>{el(id).addEventListener("input",updateRegression); el(id).addEventListener("change",updateRegression);});
+  el("regDataset").addEventListener("change",updateRegression);
+  updateRegression();
   update();
 }
 document.addEventListener("DOMContentLoaded",init);
